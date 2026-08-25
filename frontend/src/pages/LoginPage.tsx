@@ -16,7 +16,8 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(username, password)
-      navigate('/admin')
+      const role = useAuthStore.getState().user?.role
+      navigate(role === 'team_owner' ? '/owner' : '/admin')
     } catch {
       setError('Invalid username or password.')
     } finally {

@@ -34,7 +34,9 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route path="/owner/*" element={<OwnerDashboard />} />
+      <Route element={<ProtectedRoute allowedRoles={['team_owner']} />}>
+        <Route path="/owner/*" element={<OwnerDashboard />} />
+      </Route>
       <Route path="/viewer" element={<ViewerRoom />} />
       <Route path="/room-display" element={<RoomDisplay />} />
     </Routes>

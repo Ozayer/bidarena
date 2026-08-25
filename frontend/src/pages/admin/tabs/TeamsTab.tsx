@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { useState } from 'react'
 import { api } from '../../../api/client'
 import { useApiList } from '../../../api/hooks'
@@ -20,6 +21,38 @@ export default function TeamsTab({ tournament }: { tournament: Tournament }) {
   const [logo, setLogo] = useState<File | null>(null)
   const [ownerPhoto, setOwnerPhoto] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const [ownerFormTeamId, setOwnerFormTeamId] = useState<number | null>(null)
+  const [ownerUsername, setOwnerUsername] = useState('')
+  const [ownerPassword, setOwnerPassword] = useState('')
+  const [ownerError, setOwnerError] = useState<string | null>(null)
+  const [ownerSubmitting, setOwnerSubmitting] = useState(false)
+
+  function openOwnerForm(team: Team) {
+    setOwnerFormTeamId(team.id)
+    setOwnerUsername(team.owner_username ?? '')
+    setOwnerPassword('')
+    setOwnerError(null)
+  }
+
+  async function submitOwnerAccount(teamId: number) {
+    if (!ownerUsername.trim() || !ownerPassword) return
+    setOwnerSubmitting(true)
+    setOwnerError(null)
+    try {
+      await api.post(`teams/${teamId}/set-owner-account/`, {
+        username: ownerUsername.trim(),
+        password: ownerPassword,
+      })
+      setOwnerFormTeamId(null)
+      refetch()
+    } catch (err) {
+      const detail = axios.isAxiosError(err) ? (err.response?.data as { detail?: string })?.detail : null
+      setOwnerError(detail || 'Could not set owner login.')
+    } finally {
+      setOwnerSubmitting(false)
+    }
+  }
 
   function startEdit(team: Team) {
     setForm({ id: team.id, name: team.name, owner_name: team.owner_name, budget_total: team.budget_total })
@@ -152,14 +185,54 @@ export default function TeamsTab({ tournament }: { tournament: Tournament }) {
             <p className="text-sm text-slate-400">
               Budget: {team.budget_total} · Remaining: {team.budget_remaining} · Squad: {team.squad_size}
             </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Owner login: {team.owner_username ? <span className="text-slate-300">{team.owner_username}</span> : 'not set'}
+            </p>
             <div className="mt-3 flex gap-3 text-sm">
               <button onClick={() => startEdit(team)} className="text-emerald-400 hover:text-emerald-300">
                 Edit
+              </button>
+              <button onClick={() => openOwnerForm(team)} className="text-emerald-400 hover:text-emerald-300">
+                {team.owner_username ? 'Reset login' : 'Set owner login'}
               </button>
               <button onClick={() => handleDelete(team.id)} className="text-red-400 hover:text-red-300">
                 Remove
               </button>
             </div>
+
+            {ownerFormTeamId === team.id && (
+              <div className="mt-3 space-y-2 rounded border border-slate-700 bg-slate-800 p-3">
+                <input
+                  className="input"
+                  placeholder="Username"
+                  value={ownerUsername}
+                  onChange={(e) => setOwnerUsername(e.target.value)}
+                />
+                <input
+                  type="password"
+                  className="input"
+                  placeholder="Password"
+                  value={ownerPassword}
+                  onChange={(e) => setOwnerPassword(e.target.value)}
+                />
+                {ownerError && <p className="text-xs text-red-400">{ownerError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => submitOwnerAccount(team.id)}
+                    disabled={ownerSubmitting || !ownerUsername.trim() || !ownerPassword}
+                    className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    Save login
+                  </button>
+                  <button
+                    onClick={() => setOwnerFormTeamId(null)}
+                    className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
         {!loading && teams.length === 0 && <p className="text-slate-500">No teams added yet.</p>}

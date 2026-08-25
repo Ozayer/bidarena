@@ -33,6 +33,7 @@ export interface Team {
   owner_name: string
   owner_photo: string | null
   owner_user: number | null
+  owner_username: string | null
   budget_total: string
   budget_spent: string
   budget_remaining: string
@@ -94,6 +95,14 @@ export interface Bid {
   amount: string
   placed_by: number | null
   placed_at: string
+}
+
+export interface Wishlist {
+  id: number
+  team: number
+  player: number
+  added_by: number
+  created_at: string
 }
 
 export interface AuctionState {
