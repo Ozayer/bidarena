@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './client'
 import { connectAuctionSocket } from './socket'
+import { playBidCue, playSoldCue, playTimerLowCue } from '../lib/sounds'
 import type { AuctionState, Tournament } from '../types/models'
 
 interface Paginated<T> {
@@ -91,4 +92,43 @@ export function useNow(intervalMs = 500) {
     return () => clearInterval(timer)
   }, [intervalMs])
   return now
+}
+
+/** Plays a short cue when a new bid arrives or a player is marked sold, based on `AuctionState` transitions
+ * — pass `null` to skip (e.g. before the auction state has loaded). Safe to call from multiple components
+ * watching the same tournament; each just plays its own local sound. */
+export function useAuctionSoundCues(state: AuctionState | null) {
+  const lastBidId = useRef<number | null>(null)
+  const lastEventId = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!state) return
+    const newestBid = state.recent_bids[0]
+    if (newestBid && lastBidId.current !== null && newestBid.id !== lastBidId.current) {
+      playBidCue()
+    }
+    lastBidId.current = newestBid ? newestBid.id : lastBidId.current
+
+    const event = state.last_event
+    if (event && lastEventId.current !== null && event.id !== lastEventId.current && event.event_type === 'sold') {
+      playSoldCue()
+    }
+    lastEventId.current = event ? event.id : lastEventId.current
+  }, [state])
+}
+
+/** Plays a ticking cue once per second while `secondsLeft` is in the final countdown window. */
+export function useTimerLowCue(secondsLeft: number | null, threshold = 5) {
+  const lastSecond = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (secondsLeft === null || secondsLeft > threshold || secondsLeft <= 0) {
+      lastSecond.current = secondsLeft
+      return
+    }
+    if (lastSecond.current !== secondsLeft) {
+      playTimerLowCue()
+    }
+    lastSecond.current = secondsLeft
+  }, [secondsLeft, threshold])
 }

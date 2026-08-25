@@ -49,6 +49,7 @@ class AuctionStateSerializer(serializers.ModelSerializer):
     current_player_detail = PlayerSerializer(source='current_player', read_only=True)
     current_highest_team_detail = TeamSerializer(source='current_highest_team', read_only=True)
     recent_bids = serializers.SerializerMethodField()
+    last_event = serializers.SerializerMethodField()
 
     class Meta:
         model = AuctionSession
@@ -57,6 +58,7 @@ class AuctionStateSerializer(serializers.ModelSerializer):
             'current_player', 'current_player_detail', 'current_highest_bid',
             'current_highest_team', 'current_highest_team_detail', 'timer_ends_at',
             'timer_paused_remaining_seconds', 'started_at', 'updated_at', 'recent_bids',
+            'last_event',
         ]
 
     def get_recent_bids(self, obj):
@@ -66,3 +68,16 @@ class AuctionStateSerializer(serializers.ModelSerializer):
             tournament=obj.tournament, player_id=obj.current_player_id
         ).order_by('-placed_at')[:10]
         return BidSerializer(bids, many=True).data
+
+    def get_last_event(self, obj):
+        """Most recent audit event for this tournament — lets clients detect transitions
+        (e.g. a player was just marked sold) to trigger UI cues without guessing from state diffs."""
+        event = obj.tournament.auction_events.select_related('player').first()
+        if not event:
+            return None
+        return {
+            'id': event.id,
+            'event_type': event.event_type,
+            'player_name': event.player.name if event.player else None,
+            'detail': event.detail,
+        }

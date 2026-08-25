@@ -102,7 +102,7 @@ export default function TeamsTab({ tournament }: { tournament: Tournament }) {
         className="mb-6 max-w-xl space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4"
       >
         <h3 className="text-sm font-medium text-slate-200">{form.id ? 'Edit team' : 'Add a team'}</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs text-slate-400">Team name</label>
             <input

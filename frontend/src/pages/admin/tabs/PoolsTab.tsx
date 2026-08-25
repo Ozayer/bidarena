@@ -95,7 +95,7 @@ export default function PoolsTab({ tournamentId }: { tournamentId: number }) {
         Group players into bidding pools (e.g. Defender Pool A/B) and set the order they'll be auctioned in.
       </p>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div>
           <form
             onSubmit={handleSubmit}

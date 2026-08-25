@@ -25,6 +25,14 @@ export interface Position {
   order: number
 }
 
+export interface BidIncrementRule {
+  id: number
+  tournament: number
+  from_amount: string
+  to_amount: string | null
+  increment_amount: string
+}
+
 export interface Team {
   id: number
   tournament: number
@@ -121,4 +129,23 @@ export interface AuctionState {
   started_at: string | null
   updated_at: string
   recent_bids: Bid[]
+  last_event: AuctionEvent | null
+}
+
+export type AuctionEventType =
+  | 'player_started'
+  | 'sold'
+  | 'unsold'
+  | 'paused'
+  | 'resumed'
+  | 'timer_extended'
+  | 'bid_undone'
+  | 'manual_assign'
+  | 're_round_started'
+
+export interface AuctionEvent {
+  id: number
+  event_type: AuctionEventType
+  player_name: string | null
+  detail: Record<string, unknown>
 }

@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { Tournament } from '../../types/models'
+import BidRulesTab from './tabs/BidRulesTab'
 import DetailsTab from './tabs/DetailsTab'
 import PlayersTab from './tabs/PlayersTab'
 import PoolsTab from './tabs/PoolsTab'
 import PositionsTab from './tabs/PositionsTab'
 import TeamsTab from './tabs/TeamsTab'
 
-const TABS = ['Details', 'Positions', 'Teams', 'Players', 'Pools'] as const
+const TABS = ['Details', 'Positions', 'Teams', 'Players', 'Pools', 'Bid Rules'] as const
 type Tab = (typeof TABS)[number]
 
 export default function TournamentWorkspace() {
@@ -93,6 +94,7 @@ export default function TournamentWorkspace() {
       {tab === 'Teams' && <TeamsTab tournament={tournament} />}
       {tab === 'Players' && <PlayersTab tournamentId={tournament.id} />}
       {tab === 'Pools' && <PoolsTab tournamentId={tournament.id} />}
+      {tab === 'Bid Rules' && <BidRulesTab tournamentId={tournament.id} />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { useAuctionState, useNow, useTournamentBySlug } from '../../api/hooks'
+import { useAuctionState, useAuctionSoundCues, useNow, useTimerLowCue, useTournamentBySlug } from '../../api/hooks'
 import PublicTournamentPicker from './PublicTournamentPicker'
 
 export default function RoomDisplay() {
@@ -12,6 +12,15 @@ function TournamentRoomDisplay({ slug }: { slug: string }) {
   const tournament = useTournamentBySlug(slug)
   const now = useNow()
   const state = useAuctionState(tournament ? tournament.id : null)
+
+  let secondsLeft: number | null = null
+  if (state?.status === 'paused') {
+    secondsLeft = state.timer_paused_remaining_seconds
+  } else if (state?.timer_ends_at) {
+    secondsLeft = Math.max(0, Math.round((new Date(state.timer_ends_at).getTime() - now) / 1000))
+  }
+  useAuctionSoundCues(state)
+  useTimerLowCue(secondsLeft)
 
   if (tournament === null) {
     return (
@@ -32,12 +41,6 @@ function TournamentRoomDisplay({ slug }: { slug: string }) {
   }
 
   const currentPlayer = state.current_player_detail
-  let secondsLeft: number | null = null
-  if (state.status === 'paused') {
-    secondsLeft = state.timer_paused_remaining_seconds
-  } else if (state.timer_ends_at) {
-    secondsLeft = Math.max(0, Math.round((new Date(state.timer_ends_at).getTime() - now) / 1000))
-  }
 
   return (
     <div className="flex h-screen flex-col bg-slate-950 p-10 text-slate-100">

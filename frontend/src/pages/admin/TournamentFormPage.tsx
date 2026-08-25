@@ -139,7 +139,7 @@ export default function TournamentFormPage() {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm text-slate-400">Start date</label>
             <input type="date" className="input" {...field('start_date')} />

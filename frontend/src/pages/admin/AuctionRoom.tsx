@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useApiList } from '../../api/hooks'
+import { useApiList, useAuctionSoundCues, useTimerLowCue } from '../../api/hooks'
 import { connectAuctionSocket } from '../../api/socket'
 import type { AuctionState, Player, Pool, Team, Tournament } from '../../types/models'
 
@@ -101,19 +101,21 @@ export default function AuctionRoom() {
     setManualPrice('')
   }
 
+  let secondsLeft: number | null = null
+  if (state?.status === 'paused') {
+    secondsLeft = state.timer_paused_remaining_seconds
+  } else if (state?.timer_ends_at) {
+    secondsLeft = Math.max(0, Math.round((new Date(state.timer_ends_at).getTime() - now) / 1000))
+  }
+  useAuctionSoundCues(state)
+  useTimerLowCue(secondsLeft)
+
   if (!tournament || !state) return <div className="p-6 text-slate-400">Loading…</div>
 
   const currentPlayer = state.current_player_detail
   const eligiblePools = pools.filter((p) => p.status !== 'completed')
   const unsoldPlayers = players.filter((p) => p.status === 'unsold')
   const assignablePlayers = players.filter((p) => p.status !== 'sold')
-
-  let secondsLeft: number | null = null
-  if (state.status === 'paused') {
-    secondsLeft = state.timer_paused_remaining_seconds
-  } else if (state.timer_ends_at) {
-    secondsLeft = Math.max(0, Math.round((new Date(state.timer_ends_at).getTime() - now) / 1000))
-  }
 
   return (
     <div className="p-6">
@@ -238,15 +240,15 @@ export default function AuctionRoom() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {/* Current player + timer + bid ticker */}
-        <div className="col-span-2 space-y-6">
+        <div className="space-y-6 md:col-span-2">
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-6">
             {!currentPlayer && (
               <p className="text-center text-slate-500">No player currently up for bidding.</p>
             )}
             {currentPlayer && (
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
                 {currentPlayer.photo && (
                   <img src={currentPlayer.photo} alt="" className="h-24 w-24 rounded-lg object-cover" />
                 )}

@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { useAuctionState, useApiList, useNow, useTournamentBySlug } from '../../api/hooks'
+import { useAuctionState, useAuctionSoundCues, useApiList, useNow, useTimerLowCue, useTournamentBySlug } from '../../api/hooks'
 import type { Player, Position, Team } from '../../types/models'
 import PublicTournamentPicker from './PublicTournamentPicker'
 
@@ -17,6 +17,15 @@ function TournamentViewer({ slug }: { slug: string }) {
   const { data: teams } = useApiList<Team>(tournament ? `teams/?tournament=${tournament.id}` : '')
   const { data: players } = useApiList<Player>(tournament ? `players/?tournament=${tournament.id}` : '')
   const { data: positions } = useApiList<Position>(tournament ? `positions/?tournament=${tournament.id}` : '')
+
+  let secondsLeft: number | null = null
+  if (state?.status === 'paused') {
+    secondsLeft = state.timer_paused_remaining_seconds
+  } else if (state?.timer_ends_at) {
+    secondsLeft = Math.max(0, Math.round((new Date(state.timer_ends_at).getTime() - now) / 1000))
+  }
+  useAuctionSoundCues(state)
+  useTimerLowCue(secondsLeft)
 
   if (tournament === null) return <div className="p-6 text-slate-400">Loading…</div>
   if (tournament === false) {
@@ -36,12 +45,6 @@ function TournamentViewer({ slug }: { slug: string }) {
   }
 
   const currentPlayer = state.current_player_detail
-  let secondsLeft: number | null = null
-  if (state.status === 'paused') {
-    secondsLeft = state.timer_paused_remaining_seconds
-  } else if (state.timer_ends_at) {
-    secondsLeft = Math.max(0, Math.round((new Date(state.timer_ends_at).getTime() - now) / 1000))
-  }
 
   const soldPlayers = players.filter((p) => p.status === 'sold')
   const unsoldPlayers = players.filter((p) => p.status === 'unsold')
@@ -68,12 +71,12 @@ function TournamentViewer({ slug }: { slug: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="space-y-6 md:col-span-2">
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-6">
             {!currentPlayer && <p className="text-center text-slate-500">No player currently up for bidding.</p>}
             {currentPlayer && (
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
                 {currentPlayer.photo && (
                   <img src={currentPlayer.photo} alt="" className="h-24 w-24 rounded-lg object-cover" />
                 )}
@@ -117,7 +120,7 @@ function TournamentViewer({ slug }: { slug: string }) {
             </ul>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
               <h3 className="mb-2 text-sm font-medium text-slate-200">Sold ({soldPlayers.length})</h3>
               <ul className="max-h-56 divide-y divide-slate-800 overflow-y-auto">
