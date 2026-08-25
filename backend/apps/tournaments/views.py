@@ -7,7 +7,7 @@ from .serializers import BidIncrementRuleSerializer, PositionSerializer, Tournam
 class TournamentViewSet(viewsets.ModelViewSet):
     queryset = Tournament.objects.all()
     serializer_class = TournamentSerializer
-    filterset_fields = ['status']
+    filterset_fields = ['status', 'slug', 'public_guest_link_enabled']
     search_fields = ['name']
 
     def perform_create(self, serializer):

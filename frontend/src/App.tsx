@@ -38,7 +38,9 @@ export default function App() {
         <Route path="/owner/*" element={<OwnerDashboard />} />
       </Route>
       <Route path="/viewer" element={<ViewerRoom />} />
+      <Route path="/viewer/:slug" element={<ViewerRoom />} />
       <Route path="/room-display" element={<RoomDisplay />} />
+      <Route path="/room-display/:slug" element={<RoomDisplay />} />
     </Routes>
   )
 }
