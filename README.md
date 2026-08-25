@@ -1,8 +1,9 @@
 # BidArena
 
 Generic franchise-auction platform. See [REQUIREMENTS.md](REQUIREMENTS.md) for
-the full feature list and progress tracking. First tournament running on it:
-Tampere Football Mania (TFM) - Season 8.
+the full feature list and progress tracking, and [USER_GUIDE.md](USER_GUIDE.md)
+for the step-by-step flow for each user group. First tournament running on
+it: Tampere Football Mania (TFM) - Season 8.
 
 ## Stack
 
