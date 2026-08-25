@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'channels',
     'django_filters',
+    'cloudinary_storage',
+    'cloudinary',
 
     # local apps
     'apps.accounts',
@@ -44,6 +46,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -83,6 +86,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
+        'OPTIONS': {'sslmode': config('DB_SSLMODE', default='prefer')},
     }
 }
 
@@ -111,6 +115,33 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
+
+# Player photos / team logos / tournament covers go to Cloudinary's free tier
+# instead of local disk when configured, since the free Render web service's
+# filesystem is wiped on every redeploy/restart/spin-down — local disk alone
+# would mean uploaded images can vanish mid-tournament. Falls back to local
+# filesystem storage (above) when no Cloudinary credentials are set, so local
+# dev needs no Cloudinary account.
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
+}
+if CLOUDINARY_STORAGE['CLOUD_NAME']:
+    STORAGES['default'] = {'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage'}
+
+# The built React SPA (`npm run build` output). In production, WhiteNoise
+# serves its hashed assets straight from the repo root URL, and a catch-all
+# view (see urls.py) serves its index.html for any non-API/non-admin route so
+# client-side routing works on refresh/deep links, letting the whole app live
+# on one Render service/origin instead of juggling CORS across two.
+FRONTEND_DIST = BASE_DIR.parent / 'frontend' / 'dist'
+WHITENOISE_ROOT = FRONTEND_DIST
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'

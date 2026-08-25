@@ -189,7 +189,7 @@ behalf. This means:
 - [x] Concurrency-safe bid placement (bids resolved strictly in order server-side, no race conditions on simultaneous clicks) — `select_for_update()` row-locking around every session mutation in `engine.py`
 - [x] Mobile-responsive UI (owners/guests likely on phones during a live event) — fixed un-responsive `grid-cols-3`/`grid-cols-2` layouts (no mobile-stacking fallback) across the owner dashboard, guest viewer, and admin auction room; now stack to a single column below `sm`/`md` breakpoints
 - [x] Notification/sound cues: bid placed, player sold, timer running low — Web Audio API tone generator (`lib/sounds.ts`), no external audio assets
-- [x] Media storage for cover photos, player photos, team logos, owner photos — Django `ImageField`s on local filesystem storage; fine for dev, S3/production storage is a deployment decision (see §7)
+- [x] Media storage for cover photos, player photos, team logos, owner photos — Django `ImageField`s on local filesystem storage for dev; in production, storage transparently switches to Cloudinary (`django-cloudinary-storage`) when `CLOUDINARY_*` env vars are set, so uploads survive the free-tier Render web service's ephemeral disk (see [DEPLOYMENT.md](DEPLOYMENT.md))
 
 ---
 
@@ -199,8 +199,8 @@ behalf. This means:
 - **Real-time:** Django Channels + Redis (WebSockets for live bidding/viewer/room-display updates)
 - **Database:** PostgreSQL
 - **Frontend:** React (Vite + TypeScript) + Tailwind CSS, consuming REST + WebSocket APIs
-- **Media storage:** local filesystem for dev, S3-compatible object storage for production
-- **Deployment target:** TBD (decide when we get closer to launch)
+- **Media storage:** local filesystem for dev; Cloudinary (free tier) in production, via `django-cloudinary-storage`
+- **Deployment target:** Render (Web Service, serves Django API/WebSocket + built React app) + Neon (Postgres) + Render Key Value (Redis) + Cloudinary (media), all free tier — see [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ---
 
@@ -209,7 +209,7 @@ behalf. This means:
 - [ ] Any "Right to Match" / player retention concept carried over between seasons?
 - [ ] Max bid cap per player, or unlimited within budget (aside from the purse-safety floor)?
 - [x] Excel bulk upload column format — `Name` (required), `Position` (optional, must match an existing position name for the tournament), `Base Price` (required, non-negative number); any other columns are captured as `extra_info` key/value pairs.
-- [ ] Hosting/deployment environment for going live.
+- [x] Hosting/deployment environment for going live — Render + Neon + Cloudinary, all free tier, see [DEPLOYMENT.md](DEPLOYMENT.md).
 - [ ] Real project/product name, if we want something other than the "BidArena" codename.
 
 ---
@@ -217,6 +217,8 @@ behalf. This means:
 ## 8. Progress Log
 
 - 2026-08-25: Requirements gathered, doc created, tech stack proposed.
+- 2026-08-25: Deployment prep — added WhiteNoise so Django serves the built React app + admin static files from one origin (no separate frontend host/CORS needed), Postgres SSL support and `CSRF_TRUSTED_ORIGINS` for production. Wrote [DEPLOYMENT.md](DEPLOYMENT.md) (step-by-step Render + Neon free-tier deploy guide) and a local, gitignored `deploy-credentials.local.md` worksheet for recording actual account/env-var values.
+- 2026-08-25: **Media storage now Cloudinary in production**, closing the free-tier gap where uploaded player photos/team logos/tournament covers could be wiped by Render's ephemeral disk mid-tournament. Added `django-cloudinary-storage` + `cloudinary`; `STORAGES['default']` conditionally switches from local `FileSystemStorage` to `cloudinary_storage.storage.MediaCloudinaryStorage` when `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` env vars are set (all three read via `CLOUDINARY_STORAGE` in settings, not the SDK's own env-var auto-detection, so it works uniformly from a local `.env` file or real Render env vars). No app code changes needed — every `ImageField` in the project (`players.Player.photo`, `teams.Team.logo`/`owner_photo`, `tournaments.Tournament.cover_photo`/`theme_*_logo`) already goes through Django's default storage. Verified locally: `manage.py check` clean both with and without Cloudinary env vars set, and `default_storage.url(...)` confirmed to return a `res.cloudinary.com` URL once configured. Updated [DEPLOYMENT.md](DEPLOYMENT.md) with a Cloudinary signup step (now Part 2) and removed the now-obsolete "photos aren't persistent" limitation note.
 - 2026-08-25: Scope decisions locked in — all "proposed" features accepted into v1, hybrid bidding model (in-room + digital) chosen, squad composition rules deferred as optional. Repo renamed from tfm-bidding-system to bidarena to reflect generic scope. No code yet.
 - 2026-08-25: **Project scaffolded.** Installed Python 3.12, Node 26, PostgreSQL 16, Redis via Homebrew (both services running). Django backend created (`backend/`) with apps `accounts`, `tournaments`, `players`, `teams`, `pools`, `auctions`; custom `User` model with role field; core models for Tournament/Position/BidIncrementRule/Team/Player/Pool/AuctionSession/Bid/AuctionEvent/Wishlist; migrations generated and applied against `bidarena_dev` Postgres DB; Django admin registered for all models; basic DRF CRUD API live under `/api/`; Channels configured with a WebSocket consumer stub for the live auction room (`/ws/auction/<tournament_id>/`) — bid logic itself not yet implemented. React frontend created (`frontend/`) with Vite + TypeScript + Tailwind v4 + React Router + Zustand + Axios, proxying `/api` and `/ws` to the backend, with placeholder routes for Admin / Owner / Viewer / Room Display. Both dev servers smoke-tested together successfully. See `README.md` for run instructions. No feature logic (bidding engine, bulk upload, exports, etc.) implemented yet — scaffold only.
 - 2026-08-25: **Tournament/Team/Player admin CRUD built.** Added token-based login (`/api/auth/login/`) and a Zustand auth store on the frontend; `ProtectedRoute` gates `/admin/*` to `super_admin`/`tournament_admin` roles. Built out the admin area: Tournament list, create/edit form (multipart upload for cover photo, added `start_date`/`end_date` fields to the model that were missing from the initial scaffold), and a tabbed Tournament Workspace (Details / Positions / Teams / Players) with full add/edit/delete for Positions, Teams (incl. logo + owner photo upload, budget defaults from tournament), and Players (incl. photo upload, position dropdown). All verified end-to-end with a real browser session (Playwright): login → create tournament with dates → add position/team/player → data persists and displays correctly, form resets and list refetches after submit. Test data cleaned up afterward. Not yet built: Excel bulk player upload, Pools admin UI, the auction engine itself, owner/viewer UI, exports. See §0 for exact file locations.
