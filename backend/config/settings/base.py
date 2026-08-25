@@ -153,8 +153,13 @@ SITE_BASE_URL = config('SITE_BASE_URL', default='http://localhost:8000')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
+    # Token-only: the SPA authenticates via its own /login screen and sends
+    # Authorization: Token <token>, never a CSRF header. SessionAuthentication
+    # would also accept a stray Django-admin sessionid cookie (same origin,
+    # sent automatically by the browser) and then reject the request for a
+    # missing CSRF token, producing a generic "Forbidden" 403 on API calls
+    # made shortly after logging into /admin/ in the same browser.
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
