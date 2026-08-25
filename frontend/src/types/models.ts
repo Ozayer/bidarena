@@ -72,13 +72,44 @@ export interface Pool {
   status: 'pending' | 'active' | 'completed'
 }
 
+export type AuctionSessionStatus = 'not_started' | 'live' | 'paused' | 'completed'
+
 export interface AuctionSession {
   id: number
   tournament: number
-  status: 'not_started' | 'live' | 'paused' | 'completed'
+  status: AuctionSessionStatus
   active_pool: number | null
   current_player: number | null
   current_highest_bid: string | null
   current_highest_team: number | null
   timer_ends_at: string | null
+}
+
+export interface Bid {
+  id: number
+  tournament: number
+  player: number
+  team: number
+  team_name: string
+  amount: string
+  placed_by: number | null
+  placed_at: string
+}
+
+export interface AuctionState {
+  id: number
+  tournament: number
+  status: AuctionSessionStatus
+  active_pool: number | null
+  active_pool_detail: Pool | null
+  current_player: number | null
+  current_player_detail: Player | null
+  current_highest_bid: string | null
+  current_highest_team: number | null
+  current_highest_team_detail: Team | null
+  timer_ends_at: string | null
+  timer_paused_remaining_seconds: number | null
+  started_at: string | null
+  updated_at: string
+  recent_bids: Bid[]
 }

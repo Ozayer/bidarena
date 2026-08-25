@@ -27,7 +27,7 @@ psycopg-binary==3.3.4
 pycparser==3.0
 pyOpenSSL==26.4.0
 python-decouple==3.8
-redis==8.1.0
+redis==5.2.1
 reportlab==5.0.1
 service-identity==26.1.0
 sqlparse==0.6.0

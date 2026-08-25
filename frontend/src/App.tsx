@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminLayout from './layouts/AdminLayout'
 import LoginPage from './pages/LoginPage'
+import AuctionRoom from './pages/admin/AuctionRoom'
 import TournamentFormPage from './pages/admin/TournamentFormPage'
 import TournamentWorkspace from './pages/admin/TournamentWorkspace'
 import TournamentsListPage from './pages/admin/TournamentsListPage'
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="tournaments/new" element={<TournamentFormPage />} />
           <Route path="tournaments/:id/edit" element={<TournamentFormPage />} />
           <Route path="tournaments/:id" element={<TournamentWorkspace />} />
+          <Route path="tournaments/:id/auction" element={<AuctionRoom />} />
         </Route>
       </Route>
 

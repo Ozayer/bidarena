@@ -33,12 +33,20 @@ export default function TournamentWorkspace() {
           </Link>
           <h1 className="text-2xl font-semibold text-slate-100">{tournament.name}</h1>
         </div>
-        <Link
-          to={`/admin/tournaments/${tournament.id}/edit`}
-          className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-        >
-          Edit tournament
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to={`/admin/tournaments/${tournament.id}/auction`}
+            className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
+          >
+            Run Auction
+          </Link>
+          <Link
+            to={`/admin/tournaments/${tournament.id}/edit`}
+            className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            Edit tournament
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-1 border-b border-slate-800">

@@ -1,12 +1,28 @@
-from rest_framework import permissions, viewsets
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
+from apps.players.models import Player
+from apps.pools.models import Pool
+from apps.teams.models import Team
+from apps.tournaments.models import Tournament
+
+from . import engine
 from .models import AuctionEvent, AuctionSession, Bid, Wishlist
+from .broadcast import broadcast_state
 from .serializers import (
     AuctionEventSerializer,
     AuctionSessionSerializer,
+    AuctionStateSerializer,
     BidSerializer,
     WishlistSerializer,
 )
+
+
+def _actor(request):
+    return request.user if request.user.is_authenticated else None
 
 
 class AuctionSessionViewSet(viewsets.ModelViewSet):
@@ -14,17 +30,84 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
     serializer_class = AuctionSessionSerializer
     filterset_fields = ['tournament', 'status']
 
+    @action(detail=False, methods=['get'], url_path='for_tournament')
+    def for_tournament(self, request):
+        tournament = get_object_or_404(Tournament, pk=request.query_params.get('tournament'))
+        session = engine.get_or_create_session(tournament)
+        return Response(AuctionStateSerializer(session).data)
 
-class BidViewSet(viewsets.ModelViewSet):
-    """Read/create only for now — full validation (auto-increment, purse-safety,
-    timer reset) lands with the auction engine."""
+    def _locked_session(self, pk):
+        return AuctionSession.objects.select_for_update().get(pk=pk)
+
+    def _run(self, pk, fn):
+        try:
+            with transaction.atomic():
+                session = self._locked_session(pk)
+                session = fn(session)
+        except engine.EngineError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        broadcast_state(session)
+        return Response(AuctionStateSerializer(session).data)
+
+    @action(detail=True, methods=['post'])
+    def start(self, request, pk=None):
+        return self._run(pk, lambda s: engine.start_auction(s.tournament, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='next-player')
+    def next_player(self, request, pk=None):
+        pool = None
+        if request.data.get('pool'):
+            pool = get_object_or_404(Pool, pk=request.data['pool'])
+        return self._run(pk, lambda s: engine.start_next_player(s, pool=pool, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='place-bid')
+    def place_bid(self, request, pk=None):
+        team = get_object_or_404(Team, pk=request.data.get('team'))
+        return self._run(pk, lambda s: engine.place_bid(s, team, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        return self._run(pk, lambda s: engine.pause(s, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        return self._run(pk, lambda s: engine.resume(s, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='extend-timer')
+    def extend_timer(self, request, pk=None):
+        seconds = request.data.get('seconds')
+        seconds = int(seconds) if seconds else None
+        return self._run(pk, lambda s: engine.extend_timer(s, seconds=seconds, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='mark-sold')
+    def mark_sold(self, request, pk=None):
+        return self._run(pk, lambda s: engine.mark_sold(s, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='mark-unsold')
+    def mark_unsold(self, request, pk=None):
+        return self._run(pk, lambda s: engine.mark_unsold(s, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='undo-last-bid')
+    def undo_last_bid(self, request, pk=None):
+        return self._run(pk, lambda s: engine.undo_last_bid(s, actor=_actor(request)))
+
+    @action(detail=True, methods=['post'], url_path='manual-assign')
+    def manual_assign(self, request, pk=None):
+        player = get_object_or_404(Player, pk=request.data.get('player'))
+        team = get_object_or_404(Team, pk=request.data.get('team'))
+        price = request.data.get('price')
+        return self._run(
+            pk, lambda s: engine.manual_assign(s, player, team, price, actor=_actor(request))
+        )
+
+
+class BidViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only audit log — bids are placed through AuctionSessionViewSet.place_bid
+    so the engine can enforce increments, purse-safety, and concurrency locking."""
 
     queryset = Bid.objects.all()
     serializer_class = BidSerializer
     filterset_fields = ['tournament', 'player', 'team']
-
-    def perform_create(self, serializer):
-        serializer.save(placed_by=self.request.user if self.request.user.is_authenticated else None)
 
 
 class AuctionEventViewSet(viewsets.ReadOnlyModelViewSet):

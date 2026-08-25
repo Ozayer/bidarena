@@ -131,29 +131,29 @@ owner/viewer real-time UI; (3) exports (CSV/PDF).
 - [x] Reorder / prioritize pools for auction sequence
 
 ### 2.5 Running the auction
-- [ ] Start bidding for a tournament/pool
-- [ ] Randomly select next player from active pool after previous player's bidding closes
-- [ ] Admin-controlled flow: admin triggers "next player," bidding itself happens live among owners (see hybrid bidding, §2.6)
-- [ ] Auto-increment applied after each bid per configured rule
-- [ ] Countdown timer per player, resets on new bid
-  - [ ] Admin can manually **pause** the timer (mid-bid issue, dispute, technical glitch)
-  - [ ] Admin can manually **extend** the timer by a configurable amount
-  - [ ] Admin can **resume** after pause
-- [ ] Mark player SOLD → update buying team's roster + remaining budget, remove from pool
-- [ ] Mark player UNSOLD → return to an "unsold" list
-- [ ] Re-round unsold players: admin can regroup all/some unsold players into a fresh mini-pool and reopen bidding for them (repeatable)
-- [ ] Manual override: undo last bid, manually assign a player to a team (for disputes/mistakes)
-- [ ] Purse-safety check: block bids that would leave a team unable to afford its remaining minimum required players
-- [ ] Full bid history log per player (who bid what, when), viewable/exportable
+- [x] Start bidding for a tournament/pool
+- [x] Randomly select next player from active pool after previous player's bidding closes
+- [x] Admin-controlled flow: admin triggers "next player," bidding itself happens live among owners (see hybrid bidding, §2.6)
+- [x] Auto-increment applied after each bid per configured rule
+- [x] Countdown timer per player, resets on new bid
+  - [x] Admin can manually **pause** the timer (mid-bid issue, dispute, technical glitch)
+  - [x] Admin can manually **extend** the timer by a configurable amount
+  - [x] Admin can **resume** after pause
+- [x] Mark player SOLD → update buying team's roster + remaining budget, remove from pool
+- [x] Mark player UNSOLD → return to an "unsold" list
+- [x] Re-round unsold players: admin can regroup all/some unsold players into a fresh mini-pool and reopen bidding for them (repeatable)
+- [x] Manual override: undo last bid, manually assign a player to a team (for disputes/mistakes)
+- [x] Purse-safety check: block bids that would leave a team unable to afford its remaining minimum required players
+- [x] Full bid history log per player (who bid what, when), viewable/exportable — audit log; recent bids shown live in the admin control room, exports still pending
 - [ ] Export final results: team squads, spend summary, unsold list — both **CSV and PDF**
 
 ### 2.6 Hybrid bidding model
 Owners are physically present in a room together *and* can place bids digitally
 from their own device (phone/laptop) — not an auctioneer relaying on their
 behalf. This means:
-- [ ] Owner bidding UI usable standalone on any device (phone-friendly)
+- [ ] Owner bidding UI usable standalone on any device (phone-friendly) — admin control room can simulate bids on any team's behalf in the meantime
 - [ ] A **room/projector display mode**: a large-screen, login-free view showing current player, current highest bid + bidder, live timer, recent bid ticker — designed for a shared screen in the room, separate from individual owner devices
-- [ ] All connected clients (owner devices + room display + remote viewers) stay in sync in real time via the same WebSocket feed
+- [x] All connected clients (owner devices + room display + remote viewers) stay in sync in real time via the same WebSocket feed — verified with two simultaneous browser tabs
 
 ---
 
@@ -218,3 +218,4 @@ behalf. This means:
 - 2026-08-25: **Git/GitHub set up.** Repo committed and pushed to a private GitHub repo (`Ozayer/bidarena`) via `gh`.
 - 2026-08-25: **Pools admin UI built.** Added `PoolsTab.tsx` (§2.4): pool CRUD (name + optional position), up/down reorder swapping the `order` field, and a per-pool player-assignment panel (dropdown to add an unassigned player, remove button to unassign — sets/clears the player's `pool` FK and `status` between `available`/`pooled`). No backend changes needed — `Pool` model/API and `Player.pool` FK already existed from the initial scaffold. Verified end-to-end with Playwright: create pool → assign player → status flips to "In Pool" on the Players tab → reorder two pools → order persists. Test data cleaned up afterward. Next up: Excel bulk player upload, then the auction engine.
 - 2026-08-25: **Excel bulk player upload built.** Backend: `apps/players/bulk_upload.py` parses an uploaded `.xlsx` with `openpyxl` (already in `requirements.txt`); required columns `Name`/`Base Price`, optional `Position` (matched by name against the tournament's existing positions), any other columns captured into `extra_info`. Row-level validation — invalid rows are skipped and reported, valid rows are still created (no all-or-nothing transaction). Two new `PlayerViewSet` actions: `GET /api/players/bulk_upload_template/` (downloads a starter `.xlsx`) and `POST /api/players/bulk_upload/` (multipart `tournament` + `file`, returns `{created, total_rows, errors: [{row, errors[]}]}`). Frontend: `PlayersTab.tsx` got a "Bulk upload players" panel — template download link, file input, and a results readout (success count + per-row error list). Verified end-to-end (curl for the raw API, then Playwright through the UI) with a mixed valid/invalid test workbook — correct rows created, bad rows (missing name, unknown position, non-numeric price) reported with the right messages, template downloads correctly. Test data cleaned up afterward. Next up: the live auction engine (§2.5) — the biggest remaining chunk.
+- 2026-08-25: **Live auction engine + admin control room built (§2.5).** Backend: new `apps/auctions/engine.py` centralizes all state transitions (start auction, random next-player selection from the active pool, place bid with auto-increment lookup via `BidIncrementRule`/flat fallback and purse-safety enforcement, pause/resume/extend timer, mark sold/unsold, undo last bid, manual assign) behind `transaction.atomic()` + `select_for_update()` row locking on `AuctionSession` for concurrency safety. `AuctionSessionViewSet` (`/api/auction-sessions/`) exposes one REST action per transition plus `for_tournament` (get-or-create); every mutation broadcasts a rich `AuctionStateSerializer` snapshot (current player, highest bid/bidder, last 10 bids, timer) over the `auction_<tournament_id>` Channels group via `apps/auctions/broadcast.py`. `AuctionRoomConsumer` is a pure read-only relay — no client-sent messages, all writes go through REST so the engine stays the single source of truth. Added `PoolViewSet.create_re_round` (`POST /api/pools/create-re-round/`) to regroup selected unsold players into a fresh `unsold_round` pool, reopening bidding for them. Fixed two real infra bugs found while wiring this up: (1) `daphne` was missing from `INSTALLED_APPS`, so `manage.py runserver` was silently falling back to plain WSGI and every `/ws/auction/<id>/` request 404'd despite `ASGI_APPLICATION`/`CHANNEL_LAYERS` being configured; (2) the pinned `redis==8.1.0` package caused `redis.exceptions.TimeoutError` inside the live Daphne process whenever a broadcast needed to reach a connected consumer (isolated scripts using the same `channels_redis` layer worked fine, pointing to a version-compatibility issue rather than a config bug) — pinned `redis==5.2.1` in `requirements.txt`, which resolved it cleanly. Frontend: new `AuctionRoom.tsx` at `/admin/tournaments/:id/auction` (linked via a "Run Auction" button from the Tournament Workspace header) — pool selector + Start Auction/Start Next Player, live client-side countdown from `timer_ends_at`, current player card, recent-bids ticker, per-team cards with live budget/squad and a "Place bid" button (admin simulates bids since dedicated owner UI isn't built yet), Pause/Resume/Extend/Mark Sold/Mark Unsold/Undo Last Bid controls, an unsold-players panel wired to the re-round endpoint, and a manual-assign mini-form for dispute overrides. Verified end-to-end with Playwright: full lifecycle (start → next player → competing bids → undo → pause/resume → extend → sold → next player → unsold → re-round) against a real backend, plus a two-tab test confirming the WebSocket broadcast keeps a second browser in sync in real time with no manual refresh. Test data cleaned up afterward. Still open: export CSV/PDF (last §2.5 item), dedicated owner bidding UI (§3), viewer/guest UI + room display (§4).
