@@ -90,8 +90,15 @@ git push
    ```
 6. **Start Command**:
    ```bash
-   cd backend && daphne -b 0.0.0.0 -p $PORT config.asgi:application
+   cd backend && daphne -b 0.0.0.0 -p $PORT --proxy-headers config.asgi:application
    ```
+   `--proxy-headers` is required — Render terminates TLS at its edge and
+   forwards plain HTTP to your container. Without this flag, Daphne reports
+   every request as insecure regardless of what the browser used, and
+   `SECURE_SSL_REDIRECT=True` (set in `config/settings/prod.py`) then
+   redirects every request to `https://`, which Render's edge immediately
+   downgrades back to HTTP again on the way in — an infinite redirect loop
+   (`ERR_TOO_MANY_REDIRECTS` in the browser).
 7. **Instance Type**: Free.
 8. Don't click Create yet — add the environment variables below first (or
    add them right after creating and redeploy).
@@ -206,3 +213,7 @@ and watch the deploy logs on the Render dashboard.
   `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` is missing/wrong; without
   `CLOUDINARY_CLOUD_NAME` set, the app silently falls back to local (and on
   Render, ephemeral) disk storage instead of erroring.
+- **`ERR_TOO_MANY_REDIRECTS` in the browser** — the Start Command is
+  missing `--proxy-headers` (see Part 4). Without it, Daphne can't tell
+  Django that Render already terminated TLS, so `SECURE_SSL_REDIRECT`
+  redirects every request to `https://` forever.
