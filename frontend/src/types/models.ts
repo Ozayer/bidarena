@@ -55,6 +55,12 @@ export interface Player {
   sold_price: string | null
 }
 
+export interface BulkUploadResult {
+  created: number
+  total_rows: number
+  errors: { row: number; errors: string[] }[]
+}
+
 export interface Pool {
   id: number
   tournament: number

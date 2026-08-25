@@ -18,10 +18,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 **Repo location:** `~/bidarena` (local git repo, initialized, nothing committed yet — see §9).
 
 **What exists right now:** backend scaffold + Tournament/Position/Team/Player/Pool
-admin CRUD is built and working end-to-end through the UI (see checkboxes
-below — `[x]` = done, `[~]` = partially done, `[ ]` = not started). Bidding
-engine, bulk upload, exports, and owner/viewer real-time UI are still not
-implemented.
+admin CRUD, plus Excel bulk player upload, is built and working end-to-end
+through the UI (see checkboxes below — `[x]` = done, `[~]` = partially done,
+`[ ]` = not started). The bidding engine, exports, and owner/viewer real-time
+UI are still not implemented.
 
 **Machine setup already done** (Homebrew, macOS): Python 3.12, Node 26,
 PostgreSQL 16, Redis. Postgres + Redis run as background `brew services`
@@ -88,10 +88,10 @@ the Django admin).
 - Tech stack: Django+DRF+Channels/Redis+Postgres backend, React+Vite+TS+Tailwind frontend
 
 **Suggested next step when resuming:** Tournament/Team/Player/Pools admin CRUD
-is done (§2.1-2.4 checked off). Next up: (1) Excel bulk player upload with
-row-level validation; (2) the live auction engine itself — WebSocket bid
-handling, timer, auto-increment, purse-safety, sold/unsold — which is the
-biggest remaining chunk; (3) owner/viewer real-time UI; (4) exports (CSV/PDF).
+and Excel bulk player upload are done (§2.1-2.4 checked off). Next up: (1) the
+live auction engine itself — WebSocket bid handling, timer, auto-increment,
+purse-safety, sold/unsold — which is the biggest remaining chunk; (2)
+owner/viewer real-time UI; (3) exports (CSV/PDF).
 
 ---
 
@@ -116,8 +116,8 @@ biggest remaining chunk; (3) owner/viewer real-time UI; (4) exports (CSV/PDF).
 
 ### 2.2 Players
 - [x] Add single player (name, photo, position/role, base price) — `extra_info` metadata field exists on the model but has no form UI yet
-- [ ] Bulk upload players via Excel (template TBD)
-- [ ] Row-level validation/error report on bulk upload (don't fail whole file on one bad row)
+- [x] Bulk upload players via Excel (columns: Name, Position, Base Price required/matched; any other columns become `extra_info`)
+- [x] Row-level validation/error report on bulk upload (don't fail whole file on one bad row)
 - [x] Edit/remove player from registered list
 
 ### 2.3 Teams
@@ -203,7 +203,7 @@ behalf. This means:
 
 - [ ] Any "Right to Match" / player retention concept carried over between seasons?
 - [ ] Max bid cap per player, or unlimited within budget (aside from the purse-safety floor)?
-- [ ] Excel bulk upload column format — to be defined when we build that feature.
+- [x] Excel bulk upload column format — `Name` (required), `Position` (optional, must match an existing position name for the tournament), `Base Price` (required, non-negative number); any other columns are captured as `extra_info` key/value pairs.
 - [ ] Hosting/deployment environment for going live.
 - [ ] Real project/product name, if we want something other than the "BidArena" codename.
 
@@ -217,3 +217,4 @@ behalf. This means:
 - 2026-08-25: **Tournament/Team/Player admin CRUD built.** Added token-based login (`/api/auth/login/`) and a Zustand auth store on the frontend; `ProtectedRoute` gates `/admin/*` to `super_admin`/`tournament_admin` roles. Built out the admin area: Tournament list, create/edit form (multipart upload for cover photo, added `start_date`/`end_date` fields to the model that were missing from the initial scaffold), and a tabbed Tournament Workspace (Details / Positions / Teams / Players) with full add/edit/delete for Positions, Teams (incl. logo + owner photo upload, budget defaults from tournament), and Players (incl. photo upload, position dropdown). All verified end-to-end with a real browser session (Playwright): login → create tournament with dates → add position/team/player → data persists and displays correctly, form resets and list refetches after submit. Test data cleaned up afterward. Not yet built: Excel bulk player upload, Pools admin UI, the auction engine itself, owner/viewer UI, exports. See §0 for exact file locations.
 - 2026-08-25: **Git/GitHub set up.** Repo committed and pushed to a private GitHub repo (`Ozayer/bidarena`) via `gh`.
 - 2026-08-25: **Pools admin UI built.** Added `PoolsTab.tsx` (§2.4): pool CRUD (name + optional position), up/down reorder swapping the `order` field, and a per-pool player-assignment panel (dropdown to add an unassigned player, remove button to unassign — sets/clears the player's `pool` FK and `status` between `available`/`pooled`). No backend changes needed — `Pool` model/API and `Player.pool` FK already existed from the initial scaffold. Verified end-to-end with Playwright: create pool → assign player → status flips to "In Pool" on the Players tab → reorder two pools → order persists. Test data cleaned up afterward. Next up: Excel bulk player upload, then the auction engine.
+- 2026-08-25: **Excel bulk player upload built.** Backend: `apps/players/bulk_upload.py` parses an uploaded `.xlsx` with `openpyxl` (already in `requirements.txt`); required columns `Name`/`Base Price`, optional `Position` (matched by name against the tournament's existing positions), any other columns captured into `extra_info`. Row-level validation — invalid rows are skipped and reported, valid rows are still created (no all-or-nothing transaction). Two new `PlayerViewSet` actions: `GET /api/players/bulk_upload_template/` (downloads a starter `.xlsx`) and `POST /api/players/bulk_upload/` (multipart `tournament` + `file`, returns `{created, total_rows, errors: [{row, errors[]}]}`). Frontend: `PlayersTab.tsx` got a "Bulk upload players" panel — template download link, file input, and a results readout (success count + per-row error list). Verified end-to-end (curl for the raw API, then Playwright through the UI) with a mixed valid/invalid test workbook — correct rows created, bad rows (missing name, unknown position, non-numeric price) reported with the right messages, template downloads correctly. Test data cleaned up afterward. Next up: the live auction engine (§2.5) — the biggest remaining chunk.

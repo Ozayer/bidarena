@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../../../api/client'
 import { useApiList } from '../../../api/hooks'
-import type { Player, Position } from '../../../types/models'
+import type { BulkUploadResult, Player, Position } from '../../../types/models'
 
 type FormState = {
   id: number | null
@@ -26,6 +26,11 @@ export default function PlayersTab({ tournamentId }: { tournamentId: number }) {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [photo, setPhoto] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   function startEdit(player: Player) {
     setForm({
@@ -72,6 +77,27 @@ export default function PlayersTab({ tournamentId }: { tournamentId: number }) {
 
   function positionName(id: number | null) {
     return positions.find((p) => p.id === id)?.name ?? '—'
+  }
+
+  async function handleBulkUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setUploadError(null)
+    setUploadResult(null)
+    try {
+      const body = new FormData()
+      body.append('tournament', String(tournamentId))
+      body.append('file', file)
+      const res = await api.post<BulkUploadResult>('players/bulk_upload/', body)
+      setUploadResult(res.data)
+      refetch()
+    } catch {
+      setUploadError('Upload failed — make sure the file is a valid .xlsx spreadsheet.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   return (
@@ -147,9 +173,51 @@ export default function PlayersTab({ tournamentId }: { tournamentId: number }) {
         </div>
       </form>
 
-      <p className="mb-3 text-xs text-slate-500">
-        Bulk Excel upload lands in a later pass — this form covers single-player entry for now.
-      </p>
+      <div className="mb-6 max-w-xl space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <h3 className="text-sm font-medium text-slate-200">Bulk upload players (Excel)</h3>
+        <p className="text-xs text-slate-500">
+          Columns: <span className="text-slate-400">Name</span> and{' '}
+          <span className="text-slate-400">Base Price</span> are required; <span className="text-slate-400">Position</span>{' '}
+          must match an existing position name. Any other columns are stored as extra player info. Rows with
+          errors are skipped and reported — valid rows are still added.
+        </p>
+        <div className="flex items-center gap-3">
+          <a
+            href="/api/players/bulk_upload_template/"
+            download
+            className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            Download template
+          </a>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            onChange={handleBulkUpload}
+            disabled={uploading}
+            className="text-sm text-slate-300"
+          />
+        </div>
+
+        {uploading && <p className="text-sm text-slate-400">Uploading…</p>}
+        {uploadError && <p className="text-sm text-red-400">{uploadError}</p>}
+        {uploadResult && (
+          <div className="rounded border border-slate-800 bg-slate-950 p-3 text-sm">
+            <p className="text-emerald-400">
+              Added {uploadResult.created} of {uploadResult.total_rows} row{uploadResult.total_rows === 1 ? '' : 's'}.
+            </p>
+            {uploadResult.errors.length > 0 && (
+              <ul className="mt-2 space-y-1 text-red-400">
+                {uploadResult.errors.map((e) => (
+                  <li key={e.row}>
+                    Row {e.row}: {e.errors.join(' ')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       {loading && <p className="text-slate-400">Loading…</p>}
 
