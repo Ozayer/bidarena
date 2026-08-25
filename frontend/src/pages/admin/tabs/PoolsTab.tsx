@@ -28,7 +28,11 @@ export default function PoolsTab({ tournamentId }: { tournamentId: number }) {
   // queued — keep them out of the pool's active roster and still offer them
   // in the assign dropdown for any pool.
   const poolPlayers = players.filter((p) => p.pool === selectedPoolId && p.status !== 'unsold' && p.status !== 'sold')
-  const unassignedPlayers = players.filter((p) => p.pool === null || p.status === 'unsold')
+  const unassignedPlayers = players.filter(
+    (p) =>
+      (p.pool === null || p.status === 'unsold') &&
+      (!selectedPool?.position || p.position === selectedPool.position)
+  )
 
   function startEdit(pool: Pool) {
     setForm({ id: pool.id, name: pool.name, position: pool.position ? String(pool.position) : '' })

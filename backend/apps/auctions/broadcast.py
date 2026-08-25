@@ -10,6 +10,11 @@ class _AbsoluteUriBuilder:
     broadcast) that have no real request to build image/file URLs against."""
 
     def build_absolute_uri(self, url):
+        # Cloudinary-backed fields already return a fully-qualified URL (e.g.
+        # https://res.cloudinary.com/...) — only local/relative media paths need
+        # SITE_BASE_URL prepended, otherwise this produces a corrupted URL.
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
         return f'{settings.SITE_BASE_URL.rstrip("/")}{url}'
 
 

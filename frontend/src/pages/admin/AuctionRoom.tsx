@@ -17,7 +17,7 @@ export default function AuctionRoom() {
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(Date.now())
 
-  const { data: pools } = useApiList<Pool>(`pools/?tournament=${tournamentId}`)
+  const { data: pools, refetch: refetchPools } = useApiList<Pool>(`pools/?tournament=${tournamentId}`)
   const { data: teams, refetch: refetchTeams } = useApiList<Team>(`teams/?tournament=${tournamentId}`)
   const { data: players, refetch: refetchPlayers } = useApiList<Player>(`players/?tournament=${tournamentId}`)
 
@@ -87,6 +87,7 @@ export default function AuctionRoom() {
       setSelectedUnsoldIds([])
       setReRoundName('')
       refetchPlayers()
+      refetchPools()
     } catch (err) {
       const detail = axios.isAxiosError(err) ? (err.response?.data as { detail?: string })?.detail : null
       setError(detail || 'Could not create re-round pool.')
