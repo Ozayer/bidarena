@@ -23,8 +23,12 @@ export default function PoolsTab({ tournamentId }: { tournamentId: number }) {
 
   const sortedPools = [...pools].sort((a, b) => a.order - b.order)
   const selectedPool = sortedPools.find((p) => p.id === selectedPoolId) ?? null
-  const poolPlayers = players.filter((p) => p.pool === selectedPoolId)
-  const unassignedPlayers = players.filter((p) => p.pool === null)
+  // Unsold players keep a reference to their original pool (so "return to
+  // original pool" knows where to send them back), but they're not actively
+  // queued — keep them out of the pool's active roster and still offer them
+  // in the assign dropdown for any pool.
+  const poolPlayers = players.filter((p) => p.pool === selectedPoolId && p.status !== 'unsold' && p.status !== 'sold')
+  const unassignedPlayers = players.filter((p) => p.pool === null || p.status === 'unsold')
 
   function startEdit(pool: Pool) {
     setForm({ id: pool.id, name: pool.name, position: pool.position ? String(pool.position) : '' })
@@ -163,7 +167,9 @@ export default function PoolsTab({ tournamentId }: { tournamentId: number }) {
                 >
                   {pool.name}
                   <span className="ml-2 text-xs text-slate-500">
-                    {positionName(pool.position)} · {players.filter((p) => p.pool === pool.id).length} players
+                    {positionName(pool.position)} ·{' '}
+                    {players.filter((p) => p.pool === pool.id && p.status !== 'unsold' && p.status !== 'sold').length}{' '}
+                    players
                   </span>
                 </button>
                 <div className="flex items-center gap-2">
@@ -219,6 +225,7 @@ export default function PoolsTab({ tournamentId }: { tournamentId: number }) {
                   {unassignedPlayers.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
+                      {p.status === 'unsold' ? ' (unsold)' : ''}
                     </option>
                   ))}
                 </select>

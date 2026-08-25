@@ -49,12 +49,12 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
     def for_tournament(self, request):
         tournament = get_object_or_404(Tournament, pk=request.query_params.get('tournament'))
         session = engine.get_or_create_session(tournament)
-        return Response(AuctionStateSerializer(session).data)
+        return Response(AuctionStateSerializer(session, context={'request': request}).data)
 
     def _locked_session(self, pk):
         return AuctionSession.objects.select_for_update().get(pk=pk)
 
-    def _run(self, pk, fn):
+    def _run(self, request, pk, fn):
         try:
             with transaction.atomic():
                 session = self._locked_session(pk)
@@ -62,13 +62,13 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
         except engine.EngineError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         broadcast_state(session)
-        return Response(AuctionStateSerializer(session).data)
+        return Response(AuctionStateSerializer(session, context={'request': request}).data)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         if (resp := _admin_required(request)) is not None:
             return resp
-        return self._run(pk, lambda s: engine.start_auction(s.tournament, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.start_auction(s.tournament, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='next-player')
     def next_player(self, request, pk=None):
@@ -77,7 +77,7 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
         pool = None
         if request.data.get('pool'):
             pool = get_object_or_404(Pool, pk=request.data['pool'])
-        return self._run(pk, lambda s: engine.start_next_player(s, pool=pool, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.start_next_player(s, pool=pool, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='place-bid')
     def place_bid(self, request, pk=None):
@@ -86,19 +86,20 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
         team = get_object_or_404(Team, pk=request.data.get('team'))
         if not _is_admin(request.user) and team.owner_user_id != request.user.id:
             return Response({'detail': 'You can only bid for your own team.'}, status=status.HTTP_403_FORBIDDEN)
-        return self._run(pk, lambda s: engine.place_bid(s, team, actor=_actor(request)))
+        amount = request.data.get('amount')
+        return self._run(request, pk, lambda s: engine.place_bid(s, team, actor=_actor(request), amount=amount))
 
     @action(detail=True, methods=['post'])
     def pause(self, request, pk=None):
         if (resp := _admin_required(request)) is not None:
             return resp
-        return self._run(pk, lambda s: engine.pause(s, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.pause(s, actor=_actor(request)))
 
     @action(detail=True, methods=['post'])
     def resume(self, request, pk=None):
         if (resp := _admin_required(request)) is not None:
             return resp
-        return self._run(pk, lambda s: engine.resume(s, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.resume(s, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='extend-timer')
     def extend_timer(self, request, pk=None):
@@ -106,25 +107,25 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
             return resp
         seconds = request.data.get('seconds')
         seconds = int(seconds) if seconds else None
-        return self._run(pk, lambda s: engine.extend_timer(s, seconds=seconds, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.extend_timer(s, seconds=seconds, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='mark-sold')
     def mark_sold(self, request, pk=None):
         if (resp := _admin_required(request)) is not None:
             return resp
-        return self._run(pk, lambda s: engine.mark_sold(s, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.mark_sold(s, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='mark-unsold')
     def mark_unsold(self, request, pk=None):
         if (resp := _admin_required(request)) is not None:
             return resp
-        return self._run(pk, lambda s: engine.mark_unsold(s, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.mark_unsold(s, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='undo-last-bid')
     def undo_last_bid(self, request, pk=None):
         if (resp := _admin_required(request)) is not None:
             return resp
-        return self._run(pk, lambda s: engine.undo_last_bid(s, actor=_actor(request)))
+        return self._run(request, pk, lambda s: engine.undo_last_bid(s, actor=_actor(request)))
 
     @action(detail=True, methods=['post'], url_path='manual-assign')
     def manual_assign(self, request, pk=None):
@@ -134,7 +135,7 @@ class AuctionSessionViewSet(viewsets.ModelViewSet):
         team = get_object_or_404(Team, pk=request.data.get('team'))
         price = request.data.get('price')
         return self._run(
-            pk, lambda s: engine.manual_assign(s, player, team, price, actor=_actor(request))
+            request, pk, lambda s: engine.manual_assign(s, player, team, price, actor=_actor(request))
         )
 
 

@@ -15,7 +15,15 @@ export interface Tournament {
   default_team_budget: string
   bid_timer_seconds: number
   bid_timer_extend_seconds: number
+  bid_cooldown_seconds: number
+  result_display_seconds: number
   public_guest_link_enabled: boolean
+  positions?: Position[]
+  increment_rules?: BidIncrementRule[]
+  themed_display_enabled: boolean
+  theme_primary_logo: string | null
+  theme_club_logo: string | null
+  theme_sponsor_logo: string | null
 }
 
 export interface Position {
@@ -62,6 +70,7 @@ export interface Player {
   pool: number | null
   team: number | null
   sold_price: string | null
+  low_priority: boolean
 }
 
 export interface BulkUploadResult {
@@ -147,5 +156,6 @@ export interface AuctionEvent {
   id: number
   event_type: AuctionEventType
   player_name: string | null
+  player_photo: string | null
   detail: Record<string, unknown>
 }

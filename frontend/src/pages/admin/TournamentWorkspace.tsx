@@ -23,6 +23,14 @@ export default function TournamentWorkspace() {
     api.get<Tournament>(`tournaments/${tournamentId}/`).then((res) => setTournament(res.data))
   }, [tournamentId])
 
+  async function toggleThemedDisplay() {
+    if (!tournament) return
+    const res = await api.patch<Tournament>(`tournaments/${tournament.id}/`, {
+      themed_display_enabled: !tournament.themed_display_enabled,
+    })
+    setTournament(res.data)
+  }
+
   async function downloadExport(format: 'csv' | 'pdf') {
     if (!tournament) return
     const res = await api.get(`tournaments/${tournament.id}/export-${format}/`, { responseType: 'blob' })
@@ -46,6 +54,17 @@ export default function TournamentWorkspace() {
           <h1 className="text-2xl font-semibold text-slate-100">{tournament.name}</h1>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={toggleThemedDisplay}
+            title="Switch the room-display / big-screen view between the branded look and the generic look"
+            className={`rounded border px-3 py-1.5 text-sm font-medium ${
+              tournament.themed_display_enabled
+                ? 'border-amber-500 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            {tournament.themed_display_enabled ? 'Big screen: Branded ✓' : 'Big screen: Generic'}
+          </button>
           <Link
             to={`/admin/tournaments/${tournament.id}/auction`}
             className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"

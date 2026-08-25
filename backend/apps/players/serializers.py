@@ -8,6 +8,6 @@ class PlayerSerializer(serializers.ModelSerializer):
         model = Player
         fields = [
             'id', 'tournament', 'name', 'photo', 'position', 'base_price',
-            'extra_info', 'status', 'pool', 'team', 'sold_price', 'created_at',
+            'extra_info', 'status', 'pool', 'team', 'sold_price', 'low_priority', 'created_at',
         ]
         read_only_fields = ['created_at']

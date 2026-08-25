@@ -31,16 +31,42 @@ Logs in at `/login`, works entirely under `/admin/*`.
    - **Start Auction**, then **Start Next Player** to pull a random player
      from the active pool.
    - Owners bid live from their own devices; you can also place a bid on
-     any team's behalf if needed.
+     any team's behalf — either the default next-increment amount, or type
+     a **custom amount** in the box next to a team (must still clear the
+     minimum legal next bid).
+   - After any bid lands, a short cooldown briefly disables further bids so
+     nobody misreads the price mid-click. The cooldown length is
+     configurable per tournament (**Edit tournament → Bid cooldown
+     (seconds)**, default 3s, set to 0 to disable it) — tune it to the pace
+     you want the auction to run at.
    - Use **Pause / Resume / Extend Timer** for disputes or technical
      issues, **Undo Last Bid** or **Manual Assign** to correct mistakes.
-   - **Mark Sold** or **Mark Unsold** to close out the current player, then
-     **Start Next Player** again. Repeat until the pool is empty.
-   - Unsold players can be regrouped into a fresh pool and re-auctioned
-     ("re-round") from the unsold panel.
+   - **Mark Sold** or **Mark Unsold** to close out the current player. The
+     big screen then shows a result screen (player, winning team and price,
+     or "Unsold") for a configurable number of seconds (**Edit tournament →
+     Result display (seconds)**, default 6s) before switching to "waiting
+     for next player" — or it switches immediately once you click **Start
+     Next Player** again. Repeat until the pool is empty.
+   - For unsold players, either **create a re-round pool** (a fresh pool,
+     re-auctioned like normal) or **return to original pool**, which sends
+     them back where they came from but deprioritized — they're only drawn
+     once every other player in that pool has been auctioned.
 6. When the auction is done, go back to the workspace and **Export
    CSV/PDF** for the final results (team squads, spend summary, unsold
    list).
+
+### Branded big-screen display (optional, per tournament)
+
+The room-display view (`/room-display/<slug>`, step 3 under Viewer/Guest
+below) normally uses a generic dark look. To brand it for a specific
+tournament:
+
+1. Open **Edit tournament** and, under "Use branded big-screen display",
+   upload a tournament logo, club logo, and sponsor logo, then save.
+2. From the tournament workspace header, click the **Big screen: Generic /
+   Branded** button to switch the live display — it updates instantly and
+   is fully reversible, so you can toggle back to the generic view any
+   time (e.g. for a future tournament that doesn't have these assets).
 
 ## 2. Team Owner
 

@@ -75,9 +75,15 @@ class AuctionStateSerializer(serializers.ModelSerializer):
         event = obj.tournament.auction_events.select_related('player').first()
         if not event:
             return None
+        photo_url = None
+        if event.player and event.player.photo:
+            request = self.context.get('request')
+            url = event.player.photo.url
+            photo_url = request.build_absolute_uri(url) if request else url
         return {
             'id': event.id,
             'event_type': event.event_type,
             'player_name': event.player.name if event.player else None,
+            'player_photo': photo_url,
             'detail': event.detail,
         }

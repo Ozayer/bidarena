@@ -1,6 +1,6 @@
 import random
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.db.models import Q
 from django.utils import timezone
@@ -63,13 +63,22 @@ def start_next_player(session, pool=None, actor=None):
     if not target_pool:
         raise EngineError('No active pool selected.')
 
-    candidates = list(Player.objects.filter(pool=target_pool, status=Player.Status.POOLED))
+    # Normal-priority players first; only dip into the low-priority (returned
+    # unsold) group once everyone else in the pool has been auctioned.
+    candidates = list(
+        Player.objects.filter(pool=target_pool, status=Player.Status.POOLED, low_priority=False)
+    )
+    if not candidates:
+        candidates = list(
+            Player.objects.filter(pool=target_pool, status=Player.Status.POOLED, low_priority=True)
+        )
     if not candidates:
         raise EngineError('No available players left in this pool.')
 
     player = random.choice(candidates)
     player.status = Player.Status.IN_AUCTION
-    player.save(update_fields=['status'])
+    player.low_priority = False
+    player.save(update_fields=['status', 'low_priority'])
 
     session.active_pool = target_pool
     session.current_player = player
@@ -83,7 +92,7 @@ def start_next_player(session, pool=None, actor=None):
     return session
 
 
-def place_bid(session, team, actor=None):
+def place_bid(session, team, actor=None, amount=None):
     if session.status != AuctionSession.Status.LIVE:
         raise EngineError('Bidding is not currently open.')
     if not session.current_player_id:
@@ -96,10 +105,33 @@ def place_bid(session, team, actor=None):
     player = session.current_player
     tournament = session.tournament
 
+    cooldown_seconds = tournament.bid_cooldown_seconds
+    if session.current_highest_bid is not None and cooldown_seconds > 0:
+        last_bid = (
+            Bid.objects.filter(tournament=tournament, player=player).order_by('-placed_at').first()
+        )
+        if last_bid:
+            elapsed = (timezone.now() - last_bid.placed_at).total_seconds()
+            if elapsed < cooldown_seconds:
+                wait = round(cooldown_seconds - elapsed, 1)
+                raise EngineError(
+                    f'Please wait {wait}s before the next bid so everyone can see the current price.'
+                )
+
     if session.current_highest_bid is None:
-        amount = player.base_price
+        minimum_amount = player.base_price
     else:
-        amount = session.current_highest_bid + _next_increment(tournament, session.current_highest_bid)
+        minimum_amount = session.current_highest_bid + _next_increment(tournament, session.current_highest_bid)
+
+    if amount is None:
+        amount = minimum_amount
+    else:
+        try:
+            amount = Decimal(str(amount)).quantize(Decimal('0.01'))
+        except (InvalidOperation, TypeError, ValueError):
+            raise EngineError('Invalid bid amount.')
+        if amount < minimum_amount:
+            raise EngineError(f'Bid must be at least {minimum_amount} (the minimum next bid).')
 
     squad_after = team.squad_size + 1
     remaining_required_after = max(tournament.players_per_team_min - squad_after, 0)
@@ -199,7 +231,7 @@ def mark_unsold(session, actor=None):
 
     player = session.current_player
     player.status = Player.Status.UNSOLD
-    player.pool = None
+    player.low_priority = False
     player.save()
 
     _log_event(session, AuctionEvent.EventType.UNSOLD, actor=actor, player=player)

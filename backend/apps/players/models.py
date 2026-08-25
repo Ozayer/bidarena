@@ -27,6 +27,13 @@ class Player(models.Model):
     pool = models.ForeignKey(
         'pools.Pool', on_delete=models.SET_NULL, null=True, blank=True, related_name='players'
     )
+    low_priority = models.BooleanField(
+        default=False,
+        help_text=(
+            'Set when an unsold player is returned to their original pool — they are '
+            'skipped in random draws until every normal-priority player in that pool is gone.'
+        ),
+    )
     team = models.ForeignKey(
         'teams.Team', on_delete=models.SET_NULL, null=True, blank=True, related_name='players'
     )

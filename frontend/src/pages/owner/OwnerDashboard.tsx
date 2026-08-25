@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
-import { useApiList, useAuctionSoundCues, useTimerLowCue } from '../../api/hooks'
+import { useApiList, useAuctionSoundCues, useBidCooldown, useTimerLowCue } from '../../api/hooks'
 import { connectAuctionSocket } from '../../api/socket'
+import { minimumNextBid } from '../../lib/bidding'
 import { useAuthStore } from '../../store/auth'
 import type { AuctionState, Player, Position, Team, Tournament, Wishlist } from '../../types/models'
 
@@ -63,6 +64,7 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [showAllPlayers, setShowAllPlayers] = useState(false)
+  const [customAmount, setCustomAmount] = useState('')
 
   const { data: positions } = useApiList<Position>(`positions/?tournament=${team.tournament}`)
   const { data: players, refetch: refetchPlayers } = useApiList<Player>(`players/?tournament=${team.tournament}`)
@@ -94,20 +96,33 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
     return () => clearInterval(timer)
   }, [])
 
-  async function placeBid() {
+  async function placeBid(amount?: string) {
     if (!state) return
     setError(null)
     setBusy(true)
     try {
-      const res = await api.post<AuctionState>(`auction-sessions/${state.id}/place-bid/`, { team: team.id })
+      const body: Record<string, unknown> = { team: team.id }
+      if (amount) body.amount = amount
+      const res = await api.post<AuctionState>(`auction-sessions/${state.id}/place-bid/`, body)
       setState(res.data)
       refetchTeams()
+      setCustomAmount('')
     } catch (err) {
       const detail = axios.isAxiosError(err) ? (err.response?.data as { detail?: string })?.detail : null
       setError(detail || 'Could not place bid.')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function placeCustomBid() {
+    if (!customAmount) return
+    const minimum = tournament && state && currentPlayer ? minimumNextBid(tournament, state, currentPlayer) : 0
+    if (Number(customAmount) < minimum) {
+      setError(`Bid must be at least ${minimum}.`)
+      return
+    }
+    await placeBid(customAmount)
   }
 
   function isWishlisted(playerId: number) {
@@ -136,12 +151,14 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
   }
   useAuctionSoundCues(state)
   useTimerLowCue(secondsLeft)
+  const { inCooldown, remainingSeconds } = useBidCooldown(state, tournament?.bid_cooldown_seconds ?? 0)
 
   if (!tournament || !state) return <p className="text-slate-400">Loading…</p>
 
   const currentPlayer = state.current_player_detail
   const iAmHighestBidder = state.current_highest_team === team.id
-  const canBid = state.status === 'live' && !!currentPlayer && !iAmHighestBidder
+  const canBid = state.status === 'live' && !!currentPlayer && !iAmHighestBidder && !inCooldown
+  const minBid = currentPlayer ? minimumNextBid(tournament, state, currentPlayer) : 0
 
   const visiblePlayers = showAllPlayers ? players : players.filter((p) => p.status === 'available' || p.status === 'pooled')
   const mySquad = players.filter((p) => p.team === team.id && p.status === 'sold')
@@ -195,12 +212,36 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
             )}
             {currentPlayer && (
               <button
-                onClick={placeBid}
+                onClick={() => placeBid()}
                 disabled={busy || !canBid}
                 className="mt-4 w-full rounded bg-emerald-600 py-3 text-lg font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
               >
-                {iAmHighestBidder ? 'You hold the highest bid' : 'Place Bid'}
+                {iAmHighestBidder
+                  ? 'You hold the highest bid'
+                  : inCooldown
+                    ? `Wait ${remainingSeconds}s…`
+                    : `Place Bid (${minBid})`}
               </button>
+            )}
+            {currentPlayer && !iAmHighestBidder && (
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={minBid}
+                  step="0.01"
+                  placeholder={`Custom amount (min ${minBid})`}
+                  className="input"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                />
+                <button
+                  onClick={placeCustomBid}
+                  disabled={busy || !canBid || !customAmount}
+                  className="shrink-0 rounded border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Place custom bid
+                </button>
+              </div>
             )}
           </div>
 

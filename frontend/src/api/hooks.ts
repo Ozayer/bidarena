@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './client'
 import { connectAuctionSocket } from './socket'
 import { playBidCue, playSoldCue, playTimerLowCue } from '../lib/sounds'
-import type { AuctionState, Tournament } from '../types/models'
+import type { AuctionEvent, AuctionState, Tournament } from '../types/models'
 
 interface Paginated<T> {
   count: number
@@ -115,6 +115,42 @@ export function useAuctionSoundCues(state: AuctionState | null) {
     }
     lastEventId.current = event ? event.id : lastEventId.current
   }, [state])
+}
+
+/** Mirrors the server-enforced post-bid freeze (`Tournament.bid_cooldown_seconds`, admin-configurable)
+ * so bid buttons visibly disable for everyone right after a bid lands, giving people a moment to
+ * register the new price before the next bid can be placed. */
+export function useBidCooldown(state: AuctionState | null, cooldownSeconds: number) {
+  const now = useNow()
+  const lastBid = state?.recent_bids[0]
+  if (!lastBid || cooldownSeconds <= 0) return { inCooldown: false, remainingSeconds: 0 }
+  const elapsed = (now - new Date(lastBid.placed_at).getTime()) / 1000
+  const remaining = cooldownSeconds - elapsed
+  return { inCooldown: remaining > 0, remainingSeconds: Math.max(0, Math.ceil(remaining)) }
+}
+
+const RESULT_EVENT_TYPES = new Set(['sold', 'unsold', 'manual_assign'])
+
+/** For the big-screen display: once a player is marked sold/unsold, hold that result on screen
+ * (who bought them, for how much) for `resultSeconds` — or until the next player starts, whichever
+ * comes first — before falling back to the "waiting for next player" state. `resultSeconds <= 0`
+ * means "show until the next player starts" with no time limit. */
+export function useResultScreen(state: AuctionState | null, resultSeconds: number) {
+  const now = useNow()
+  const [shown, setShown] = useState<{ event: AuctionEvent; shownAt: number } | null>(null)
+  const lastEventId = state?.last_event?.id
+  const hasCurrentPlayer = !!state?.current_player_detail
+
+  useEffect(() => {
+    const event = state?.last_event
+    if (!event || !RESULT_EVENT_TYPES.has(event.event_type) || hasCurrentPlayer) return
+    setShown((prev) => (prev?.event.id === event.id ? prev : { event, shownAt: Date.now() }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastEventId, hasCurrentPlayer])
+
+  if (!shown || hasCurrentPlayer) return null
+  if (resultSeconds > 0 && now - shown.shownAt >= resultSeconds * 1000) return null
+  return shown.event
 }
 
 /** Plays a ticking cue once per second while `secondsLeft` is in the final countdown window. */

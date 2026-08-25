@@ -115,6 +115,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Used to build absolute media URLs (photos/logos) for WebSocket broadcasts, where there's
+# no HTTP request to build one from the way DRF normally does for REST responses.
+SITE_BASE_URL = config('SITE_BASE_URL', default='http://localhost:8000')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {

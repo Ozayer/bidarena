@@ -1,9 +1,10 @@
 import axios from 'axios'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useApiList, useAuctionSoundCues, useTimerLowCue } from '../../api/hooks'
+import { useApiList, useAuctionSoundCues, useBidCooldown, useTimerLowCue } from '../../api/hooks'
 import { connectAuctionSocket } from '../../api/socket'
+import { minimumNextBid } from '../../lib/bidding'
 import type { AuctionState, Player, Pool, Team, Tournament } from '../../types/models'
 
 export default function AuctionRoom() {
@@ -27,6 +28,7 @@ export default function AuctionRoom() {
   const [manualPlayerId, setManualPlayerId] = useState('')
   const [manualTeamId, setManualTeamId] = useState('')
   const [manualPrice, setManualPrice] = useState('')
+  const [customBidAmounts, setCustomBidAmounts] = useState<Record<number, string>>({})
 
   useEffect(() => {
     api.get<Tournament>(`tournaments/${tournamentId}/`).then((res) => setTournament(res.data))
@@ -101,6 +103,37 @@ export default function AuctionRoom() {
     setManualPrice('')
   }
 
+  async function returnUnsoldToPool() {
+    if (selectedUnsoldIds.length === 0) return
+    setError(null)
+    setBusy(true)
+    try {
+      await api.post('pools/return-unsold-to-pool/', {
+        tournament: tournamentId,
+        player_ids: selectedUnsoldIds,
+      })
+      setSelectedUnsoldIds([])
+      refetchPlayers()
+    } catch (err) {
+      const detail = axios.isAxiosError(err) ? (err.response?.data as { detail?: string })?.detail : null
+      setError(detail || 'Could not return players to their original pool.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function placeCustomBid(team: Team) {
+    const amount = customBidAmounts[team.id]
+    if (!amount) return
+    const minimum = tournament && state && currentPlayer ? minimumNextBid(tournament, state, currentPlayer) : 0
+    if (Number(amount) < minimum) {
+      setError(`Bid must be at least ${minimum}.`)
+      return
+    }
+    await runAction('place-bid', { team: team.id, amount })
+    setCustomBidAmounts((prev) => ({ ...prev, [team.id]: '' }))
+  }
+
   let secondsLeft: number | null = null
   if (state?.status === 'paused') {
     secondsLeft = state.timer_paused_remaining_seconds
@@ -109,6 +142,7 @@ export default function AuctionRoom() {
   }
   useAuctionSoundCues(state)
   useTimerLowCue(secondsLeft)
+  const { inCooldown, remainingSeconds } = useBidCooldown(state, tournament?.bid_cooldown_seconds ?? 0)
 
   if (!tournament || !state) return <div className="p-6 text-slate-400">Loading…</div>
 
@@ -309,7 +343,7 @@ export default function AuctionRoom() {
               ))}
               {unsoldPlayers.length === 0 && <li className="py-2 text-sm text-slate-500">No unsold players.</li>}
             </ul>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 className="input"
                 placeholder="Re-round pool name (optional)"
@@ -322,6 +356,14 @@ export default function AuctionRoom() {
                 className="shrink-0 rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
               >
                 Create re-round pool
+              </button>
+              <button
+                onClick={returnUnsoldToPool}
+                disabled={busy || selectedUnsoldIds.length === 0}
+                title="Sends each selected player back into the pool they came from — they're skipped until everyone else in that pool has been auctioned"
+                className="shrink-0 rounded border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                Return to original pool
               </button>
             </div>
           </div>
@@ -382,11 +424,40 @@ export default function AuctionRoom() {
               {currentPlayer && (
                 <button
                   onClick={() => runAction('place-bid', { team: team.id })}
-                  disabled={busy || state.status !== 'live' || state.current_highest_team === team.id}
+                  disabled={
+                    busy || state.status !== 'live' || state.current_highest_team === team.id || inCooldown
+                  }
                   className="mt-2 w-full rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
                 >
-                  Place bid
+                  {inCooldown ? `Wait ${remainingSeconds}s…` : 'Place bid'}
                 </button>
+              )}
+              {currentPlayer && state.current_highest_team !== team.id && (
+                <div className="mt-2 flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={minimumNextBid(tournament, state, currentPlayer)}
+                    step="0.01"
+                    placeholder={`Custom (min ${minimumNextBid(tournament, state, currentPlayer)})`}
+                    className="input py-1 text-sm"
+                    value={customBidAmounts[team.id] ?? ''}
+                    onChange={(e) =>
+                      setCustomBidAmounts((prev) => ({ ...prev, [team.id]: e.target.value }))
+                    }
+                  />
+                  <button
+                    onClick={() => placeCustomBid(team)}
+                    disabled={
+                      busy ||
+                      state.status !== 'live' ||
+                      inCooldown ||
+                      !customBidAmounts[team.id]
+                    }
+                    className="shrink-0 rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Bid
+                  </button>
+                </div>
               )}
             </div>
           ))}

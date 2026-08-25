@@ -8,6 +8,8 @@ export default function DetailsTab({ tournament: t }: { tournament: Tournament }
     ['Players per team', `${t.players_per_team_min} - ${t.players_per_team_max}`],
     ['Default team budget', t.default_team_budget],
     ['Bid timer', `${t.bid_timer_seconds}s (extend by ${t.bid_timer_extend_seconds}s)`],
+    ['Bid cooldown', t.bid_cooldown_seconds > 0 ? `${t.bid_cooldown_seconds}s` : 'Disabled'],
+    ['Result display', t.result_display_seconds > 0 ? `${t.result_display_seconds}s` : 'Until next player'],
     ['Public guest link', t.public_guest_link_enabled ? 'Enabled' : 'Disabled'],
   ]
 

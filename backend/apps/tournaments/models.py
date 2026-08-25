@@ -33,8 +33,30 @@ class Tournament(models.Model):
     bid_timer_extend_seconds = models.PositiveIntegerField(
         default=15, help_text='Seconds added when admin manually extends the timer'
     )
+    bid_cooldown_seconds = models.PositiveIntegerField(
+        default=3,
+        help_text=(
+            'Short freeze after each bid before another bid can land, so everyone has time to '
+            'register the new price. Set to 0 to disable.'
+        ),
+    )
+    result_display_seconds = models.PositiveIntegerField(
+        default=6,
+        help_text=(
+            'How long the big-screen display shows the sold/unsold result (player, team, price) '
+            'before switching to "waiting for next player". Ends early if the next player starts first.'
+        ),
+    )
 
     public_guest_link_enabled = models.BooleanField(default=True)
+
+    themed_display_enabled = models.BooleanField(
+        default=False,
+        help_text='Show a branded big-screen display (with the logos below) instead of the generic one.',
+    )
+    theme_primary_logo = models.ImageField(upload_to='tournaments/theme/', blank=True, null=True)
+    theme_club_logo = models.ImageField(upload_to='tournaments/theme/', blank=True, null=True)
+    theme_sponsor_logo = models.ImageField(upload_to='tournaments/theme/', blank=True, null=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,

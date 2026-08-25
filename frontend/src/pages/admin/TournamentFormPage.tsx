@@ -15,7 +15,10 @@ type FormState = {
   default_team_budget: string
   bid_timer_seconds: string
   bid_timer_extend_seconds: string
+  bid_cooldown_seconds: string
+  result_display_seconds: string
   public_guest_link_enabled: boolean
+  themed_display_enabled: boolean
 }
 
 const emptyForm: FormState = {
@@ -30,7 +33,10 @@ const emptyForm: FormState = {
   default_team_budget: '0',
   bid_timer_seconds: '15',
   bid_timer_extend_seconds: '15',
+  bid_cooldown_seconds: '3',
+  result_display_seconds: '6',
   public_guest_link_enabled: true,
+  themed_display_enabled: false,
 }
 
 export default function TournamentFormPage() {
@@ -40,6 +46,10 @@ export default function TournamentFormPage() {
 
   const [form, setForm] = useState<FormState>(emptyForm)
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null)
+  const [themePrimaryLogo, setThemePrimaryLogo] = useState<File | null>(null)
+  const [themeClubLogo, setThemeClubLogo] = useState<File | null>(null)
+  const [themeSponsorLogo, setThemeSponsorLogo] = useState<File | null>(null)
+  const [existingTournament, setExistingTournament] = useState<Tournament | null>(null)
   const [loading, setLoading] = useState(isEdit)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -48,6 +58,7 @@ export default function TournamentFormPage() {
     if (!isEdit) return
     api.get<Tournament>(`tournaments/${id}/`).then((res) => {
       const t = res.data
+      setExistingTournament(t)
       setForm({
         name: t.name,
         description: t.description,
@@ -60,7 +71,10 @@ export default function TournamentFormPage() {
         default_team_budget: t.default_team_budget,
         bid_timer_seconds: String(t.bid_timer_seconds),
         bid_timer_extend_seconds: String(t.bid_timer_extend_seconds),
+        bid_cooldown_seconds: String(t.bid_cooldown_seconds),
+        result_display_seconds: String(t.result_display_seconds),
         public_guest_link_enabled: t.public_guest_link_enabled,
+        themed_display_enabled: t.themed_display_enabled,
       })
       setLoading(false)
     })
@@ -85,6 +99,9 @@ export default function TournamentFormPage() {
       body.append(key, String(value))
     })
     if (coverPhoto) body.append('cover_photo', coverPhoto)
+    if (themePrimaryLogo) body.append('theme_primary_logo', themePrimaryLogo)
+    if (themeClubLogo) body.append('theme_club_logo', themeClubLogo)
+    if (themeSponsorLogo) body.append('theme_sponsor_logo', themeSponsorLogo)
 
     try {
       const res = isEdit
@@ -172,6 +189,21 @@ export default function TournamentFormPage() {
             <label className="mb-1 block text-sm text-slate-400">Timer extend-by (seconds)</label>
             <input type="number" min={1} className="input" {...field('bid_timer_extend_seconds')} />
           </div>
+          <div>
+            <label className="mb-1 block text-sm text-slate-400">Bid cooldown (seconds)</label>
+            <input type="number" min={0} className="input" {...field('bid_cooldown_seconds')} />
+            <p className="mt-1 text-xs text-slate-500">
+              Freeze after each bid before another can land, so nobody misreads the price. 0 disables it.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-slate-400">Result display (seconds)</label>
+            <input type="number" min={0} className="input" {...field('result_display_seconds')} />
+            <p className="mt-1 text-xs text-slate-500">
+              How long the big screen shows "sold/unsold to ..." before switching to the waiting
+              screen. Ends early if the next player starts first.
+            </p>
+          </div>
         </div>
 
         <label className="flex items-center gap-2 text-sm text-slate-300">
@@ -182,6 +214,60 @@ export default function TournamentFormPage() {
           />
           Enable public guest link
         </label>
+
+        <div className="rounded border border-slate-800 p-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-200">
+            <input
+              type="checkbox"
+              checked={form.themed_display_enabled}
+              onChange={(e) => setForm((f) => ({ ...f, themed_display_enabled: e.target.checked }))}
+            />
+            Use branded big-screen display (room display)
+          </label>
+          <p className="mt-1 text-xs text-slate-500">
+            When on, the room-display / big-screen view shows this tournament's logos instead of the
+            generic look. Toggle it off any time to go back to the generic view.
+          </p>
+
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Tournament logo</label>
+              {existingTournament?.theme_primary_logo && !themePrimaryLogo && (
+                <img src={existingTournament.theme_primary_logo} alt="" className="mb-2 h-16 w-16 rounded-full object-cover" />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setThemePrimaryLogo(e.target.files?.[0] ?? null)}
+                className="text-sm text-slate-300"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Club logo</label>
+              {existingTournament?.theme_club_logo && !themeClubLogo && (
+                <img src={existingTournament.theme_club_logo} alt="" className="mb-2 h-16 w-16 rounded-full object-cover" />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setThemeClubLogo(e.target.files?.[0] ?? null)}
+                className="text-sm text-slate-300"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Sponsor logo</label>
+              {existingTournament?.theme_sponsor_logo && !themeSponsorLogo && (
+                <img src={existingTournament.theme_sponsor_logo} alt="" className="mb-2 h-16 w-16 rounded-full object-cover" />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setThemeSponsorLogo(e.target.files?.[0] ?? null)}
+                className="text-sm text-slate-300"
+              />
+            </div>
+          </div>
+        </div>
 
         <div className="flex gap-3 pt-2">
           <button
