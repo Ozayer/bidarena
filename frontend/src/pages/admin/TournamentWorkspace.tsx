@@ -22,6 +22,17 @@ export default function TournamentWorkspace() {
     api.get<Tournament>(`tournaments/${tournamentId}/`).then((res) => setTournament(res.data))
   }, [tournamentId])
 
+  async function downloadExport(format: 'csv' | 'pdf') {
+    if (!tournament) return
+    const res = await api.get(`tournaments/${tournament.id}/export-${format}/`, { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data as Blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${tournament.slug}-results.${format}`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (!tournament) return <div className="p-6 text-slate-400">Loading…</div>
 
   return (
@@ -40,6 +51,18 @@ export default function TournamentWorkspace() {
           >
             Run Auction
           </Link>
+          <button
+            onClick={() => downloadExport('csv')}
+            className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => downloadExport('pdf')}
+            className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            Export PDF
+          </button>
           <Link
             to={`/admin/tournaments/${tournament.id}/edit`}
             className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
