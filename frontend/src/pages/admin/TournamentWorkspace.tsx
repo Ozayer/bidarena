@@ -4,10 +4,11 @@ import { api } from '../../api/client'
 import type { Tournament } from '../../types/models'
 import DetailsTab from './tabs/DetailsTab'
 import PlayersTab from './tabs/PlayersTab'
+import PoolsTab from './tabs/PoolsTab'
 import PositionsTab from './tabs/PositionsTab'
 import TeamsTab from './tabs/TeamsTab'
 
-const TABS = ['Details', 'Positions', 'Teams', 'Players'] as const
+const TABS = ['Details', 'Positions', 'Teams', 'Players', 'Pools'] as const
 type Tab = (typeof TABS)[number]
 
 export default function TournamentWorkspace() {
@@ -60,6 +61,7 @@ export default function TournamentWorkspace() {
       {tab === 'Positions' && <PositionsTab tournamentId={tournament.id} />}
       {tab === 'Teams' && <TeamsTab tournament={tournament} />}
       {tab === 'Players' && <PlayersTab tournamentId={tournament.id} />}
+      {tab === 'Pools' && <PoolsTab tournamentId={tournament.id} />}
     </div>
   )
 }

@@ -17,7 +17,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 **Repo location:** `~/bidarena` (local git repo, initialized, nothing committed yet — see §9).
 
-**What exists right now:** backend scaffold + Tournament/Position/Team/Player
+**What exists right now:** backend scaffold + Tournament/Position/Team/Player/Pool
 admin CRUD is built and working end-to-end through the UI (see checkboxes
 below — `[x]` = done, `[~]` = partially done, `[ ]` = not started). Bidding
 engine, bulk upload, exports, and owner/viewer real-time UI are still not
@@ -64,7 +64,7 @@ stub — no bidding logic yet.
 - `components/ProtectedRoute.tsx` — route guard, supports `allowedRoles`
 - `layouts/AdminLayout.tsx` — admin shell (nav + logout), wraps `/admin/*`
 - `pages/admin/TournamentsListPage.tsx`, `TournamentFormPage.tsx` (create/edit, multipart for cover photo), `TournamentWorkspace.tsx` (tabbed view: Details/Positions/Teams/Players)
-- `pages/admin/tabs/` — `DetailsTab`, `PositionsTab`, `TeamsTab`, `PlayersTab`, all working CRUD against the live API (list/add/edit/delete, image upload via `FormData`)
+- `pages/admin/tabs/` — `DetailsTab`, `PositionsTab`, `TeamsTab`, `PlayersTab`, `PoolsTab`, all working CRUD against the live API (list/add/edit/delete, image upload via `FormData`; `PoolsTab` also handles player-to-pool assignment and drag-free up/down reordering)
 - `pages/owner/`, `pages/viewer/` (+ `RoomDisplay.tsx`) — still placeholder components, not built yet
 
 Dev login used for testing: `admin` / `admin12345`, role manually set to
@@ -87,12 +87,11 @@ the Django admin).
 - Excel bulk upload needs row-level validation, not all-or-nothing
 - Tech stack: Django+DRF+Channels/Redis+Postgres backend, React+Vite+TS+Tailwind frontend
 
-**Suggested next step when resuming:** Tournament/Team/Player admin CRUD is
-done (§2.1-2.3 mostly checked off). Next up: (1) Pools admin UI — create
-pools, assign players to them (§2.4); (2) Excel bulk player upload with
-row-level validation; (3) the live auction engine itself — WebSocket bid
+**Suggested next step when resuming:** Tournament/Team/Player/Pools admin CRUD
+is done (§2.1-2.4 checked off). Next up: (1) Excel bulk player upload with
+row-level validation; (2) the live auction engine itself — WebSocket bid
 handling, timer, auto-increment, purse-safety, sold/unsold — which is the
-biggest remaining chunk; (4) owner/viewer real-time UI; (5) exports (CSV/PDF).
+biggest remaining chunk; (3) owner/viewer real-time UI; (4) exports (CSV/PDF).
 
 ---
 
@@ -127,9 +126,9 @@ biggest remaining chunk; (4) owner/viewer real-time UI; (5) exports (CSV/PDF).
 - [x] Assign starting budget per team (defaults to tournament budget, overridable)
 
 ### 2.4 Pools
-- [ ] Create bidding pools (e.g. Defender Pool A/B), generic naming so any sport's positions work
-- [ ] Map/assign registered players to pools
-- [ ] Reorder / prioritize pools for auction sequence
+- [x] Create bidding pools (e.g. Defender Pool A/B), generic naming so any sport's positions work
+- [x] Map/assign registered players to pools
+- [x] Reorder / prioritize pools for auction sequence
 
 ### 2.5 Running the auction
 - [ ] Start bidding for a tournament/pool
@@ -216,3 +215,5 @@ behalf. This means:
 - 2026-08-25: Scope decisions locked in — all "proposed" features accepted into v1, hybrid bidding model (in-room + digital) chosen, squad composition rules deferred as optional. Repo renamed from tfm-bidding-system to bidarena to reflect generic scope. No code yet.
 - 2026-08-25: **Project scaffolded.** Installed Python 3.12, Node 26, PostgreSQL 16, Redis via Homebrew (both services running). Django backend created (`backend/`) with apps `accounts`, `tournaments`, `players`, `teams`, `pools`, `auctions`; custom `User` model with role field; core models for Tournament/Position/BidIncrementRule/Team/Player/Pool/AuctionSession/Bid/AuctionEvent/Wishlist; migrations generated and applied against `bidarena_dev` Postgres DB; Django admin registered for all models; basic DRF CRUD API live under `/api/`; Channels configured with a WebSocket consumer stub for the live auction room (`/ws/auction/<tournament_id>/`) — bid logic itself not yet implemented. React frontend created (`frontend/`) with Vite + TypeScript + Tailwind v4 + React Router + Zustand + Axios, proxying `/api` and `/ws` to the backend, with placeholder routes for Admin / Owner / Viewer / Room Display. Both dev servers smoke-tested together successfully. See `README.md` for run instructions. No feature logic (bidding engine, bulk upload, exports, etc.) implemented yet — scaffold only.
 - 2026-08-25: **Tournament/Team/Player admin CRUD built.** Added token-based login (`/api/auth/login/`) and a Zustand auth store on the frontend; `ProtectedRoute` gates `/admin/*` to `super_admin`/`tournament_admin` roles. Built out the admin area: Tournament list, create/edit form (multipart upload for cover photo, added `start_date`/`end_date` fields to the model that were missing from the initial scaffold), and a tabbed Tournament Workspace (Details / Positions / Teams / Players) with full add/edit/delete for Positions, Teams (incl. logo + owner photo upload, budget defaults from tournament), and Players (incl. photo upload, position dropdown). All verified end-to-end with a real browser session (Playwright): login → create tournament with dates → add position/team/player → data persists and displays correctly, form resets and list refetches after submit. Test data cleaned up afterward. Not yet built: Excel bulk player upload, Pools admin UI, the auction engine itself, owner/viewer UI, exports. See §0 for exact file locations.
+- 2026-08-25: **Git/GitHub set up.** Repo committed and pushed to a private GitHub repo (`Ozayer/bidarena`) via `gh`.
+- 2026-08-25: **Pools admin UI built.** Added `PoolsTab.tsx` (§2.4): pool CRUD (name + optional position), up/down reorder swapping the `order` field, and a per-pool player-assignment panel (dropdown to add an unassigned player, remove button to unassign — sets/clears the player's `pool` FK and `status` between `available`/`pooled`). No backend changes needed — `Pool` model/API and `Player.pool` FK already existed from the initial scaffold. Verified end-to-end with Playwright: create pool → assign player → status flips to "In Pool" on the Players tab → reorder two pools → order persists. Test data cleaned up afterward. Next up: Excel bulk player upload, then the auction engine.
