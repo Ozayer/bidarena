@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useApiList, useAuctionSoundCues, useBidCooldown, useTimerLowCue } from '../../api/hooks'
 import { connectAuctionSocket } from '../../api/socket'
+import PlayerRow from '../../components/PlayerRow'
 import { minimumNextBid } from '../../lib/bidding'
+import { groupPlayersByPool } from '../../lib/players'
 import { useAuthStore } from '../../store/auth'
-import type { AuctionState, Player, Position, Team, Tournament, Wishlist } from '../../types/models'
+import type { AuctionState, Player, Pool, Position, Team, Tournament, Wishlist } from '../../types/models'
 
 export default function OwnerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -69,6 +71,7 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
 
   const { data: positions } = useApiList<Position>(`positions/?tournament=${team.tournament}`)
   const { data: players, refetch: refetchPlayers } = useApiList<Player>(`players/?tournament=${team.tournament}`)
+  const { data: pools } = useApiList<Pool>(`pools/?tournament=${team.tournament}`)
   const { data: wishlist, refetch: refetchWishlist } = useApiList<Wishlist>(`wishlist/?team=${team.id}`)
 
   useEffect(() => {
@@ -163,6 +166,7 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
 
   const visiblePlayers = showAllPlayers ? players : players.filter((p) => p.status === 'available' || p.status === 'pooled')
   const mySquad = players.filter((p) => p.team === team.id && p.status === 'sold')
+  const poolGroups = groupPlayersByPool(visiblePlayers, pools)
 
   return (
     <div>
@@ -267,62 +271,27 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
                 Show all players
               </label>
             </div>
-            <ul className="max-h-72 divide-y divide-slate-800 overflow-y-auto">
-              {visiblePlayers.map((player) => {
-                const isExpanded = expandedPlayerId === player.id
-                const extraInfo = Object.entries(player.extra_info ?? {})
-                return (
-                  <li key={player.id} className="px-1 py-2 text-sm">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedPlayerId(isExpanded ? null : player.id)}
-                      className="flex w-full items-center justify-between text-left"
-                    >
-                      <div>
-                        <span className="text-slate-100">{player.name}</span>
-                        <span className="ml-2 text-xs text-slate-500">
-                          {positionName(player.position)} · {player.base_price} · {player.status}
-                        </span>
-                      </div>
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleWishlist(player)
-                        }}
-                        title={isWishlisted(player.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                        className={isWishlisted(player.id) ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}
-                      >
-                        ★
-                      </span>
-                    </button>
-                    {isExpanded && (
-                      <div className="mt-2 flex gap-3 rounded border border-slate-800 bg-slate-950 p-3">
-                        {player.photo && (
-                          <img src={player.photo} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
-                        )}
-                        <div className="space-y-1 text-xs">
-                          <p className="text-slate-300">
-                            Position: <span className="text-slate-100">{positionName(player.position)}</span>
-                          </p>
-                          <p className="text-slate-300">
-                            Base price: <span className="text-slate-100">{player.base_price}</span>
-                          </p>
-                          <p className="text-slate-300">
-                            Status: <span className="text-slate-100">{player.status}</span>
-                          </p>
-                          {extraInfo.map(([key, value]) => (
-                            <p key={key} className="text-slate-300 capitalize">
-                              {key}: <span className="text-slate-100">{String(value)}</span>
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
-              {visiblePlayers.length === 0 && <li className="py-2 text-sm text-slate-500">No players to show.</li>}
-            </ul>
+            <div className="max-h-72 space-y-4 overflow-y-auto">
+              {poolGroups.map((group) => (
+                <div key={group.key}>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
+                  <ul className="divide-y divide-slate-800">
+                    {group.players.map((player) => (
+                      <PlayerRow
+                        key={player.id}
+                        player={player}
+                        positionName={positionName}
+                        isExpanded={expandedPlayerId === player.id}
+                        onToggleExpand={() => setExpandedPlayerId(expandedPlayerId === player.id ? null : player.id)}
+                        isWishlisted={isWishlisted(player.id)}
+                        onToggleWishlist={() => toggleWishlist(player)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {poolGroups.length === 0 && <p className="py-2 text-sm text-slate-500">No players to show.</p>}
+            </div>
           </div>
         </div>
 

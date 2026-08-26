@@ -84,9 +84,10 @@ No self-signup — the admin creates the login (step 3 above) and shares it.
    - A **Place Bid** button — click it to bid the next increment amount
      (disabled once you already hold the highest bid).
    - A live **recent bids** ticker and your **remaining budget**.
-4. Browse the full **player pool** at any time, and star players onto your
-   private **wishlist** (only you can see it). Click a player to expand their
-   photo and full details (nationality, club, etc., if the admin added them).
+4. Browse the full **player pool** at any time, grouped by pool, and star
+   players onto your private **wishlist** (only you can see it). Click a
+   player to expand their photo and full details (nationality, club, etc.,
+   if the admin added them).
 5. As players are sold to you, they appear in **My squad** with the price
    you paid.
 
@@ -96,7 +97,9 @@ No login needed — just a link from the admin.
 
 1. Open the shared link:
    - `/viewer/<tournament-slug>` — a normal dashboard: current player/bid,
-     recent bids, sold/unsold lists, and every team's budget/squad.
+     recent bids, the full player pool grouped by pool (click a player for
+     details), sold/unsold lists, and every team's budget — click a team to
+     expand its squad so far (players won + price).
    - `/room-display/<tournament-slug>` — a big-screen, minimal-chrome view
      meant for a projector or shared TV in the room.
 2. Everything updates live as the admin runs the auction — no refresh

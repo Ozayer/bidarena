@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuctionState, useAuctionSoundCues, useApiList, useNow, useTimerLowCue, useTournamentBySlug } from '../../api/hooks'
-import type { Player, Position, Team } from '../../types/models'
+import PlayerRow from '../../components/PlayerRow'
+import { groupPlayersByPool } from '../../lib/players'
+import type { Player, Pool, Position, Team } from '../../types/models'
 import PublicTournamentPicker from './PublicTournamentPicker'
 
 export default function ViewerRoom() {
@@ -17,6 +20,10 @@ function TournamentViewer({ slug }: { slug: string }) {
   const { data: teams } = useApiList<Team>(tournament ? `teams/?tournament=${tournament.id}` : '')
   const { data: players } = useApiList<Player>(tournament ? `players/?tournament=${tournament.id}` : '')
   const { data: positions } = useApiList<Position>(tournament ? `positions/?tournament=${tournament.id}` : '')
+  const { data: pools } = useApiList<Pool>(tournament ? `pools/?tournament=${tournament.id}` : '')
+
+  const [expandedPlayerId, setExpandedPlayerId] = useState<number | null>(null)
+  const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null)
 
   let secondsLeft: number | null = null
   if (state?.status === 'paused') {
@@ -48,6 +55,8 @@ function TournamentViewer({ slug }: { slug: string }) {
 
   const soldPlayers = players.filter((p) => p.status === 'sold')
   const unsoldPlayers = players.filter((p) => p.status === 'unsold')
+  const poolablePlayers = players.filter((p) => p.status === 'available' || p.status === 'pooled')
+  const poolGroups = groupPlayersByPool(poolablePlayers, pools)
 
   return (
     <div className="p-6">
@@ -120,6 +129,29 @@ function TournamentViewer({ slug }: { slug: string }) {
             </ul>
           </div>
 
+          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+            <h3 className="mb-2 text-sm font-medium text-slate-200">Player pool ({poolablePlayers.length})</h3>
+            <div className="max-h-72 space-y-4 overflow-y-auto">
+              {poolGroups.map((group) => (
+                <div key={group.key}>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
+                  <ul className="divide-y divide-slate-800">
+                    {group.players.map((player) => (
+                      <PlayerRow
+                        key={player.id}
+                        player={player}
+                        positionName={positionName}
+                        isExpanded={expandedPlayerId === player.id}
+                        onToggleExpand={() => setExpandedPlayerId(expandedPlayerId === player.id ? null : player.id)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {poolGroups.length === 0 && <p className="py-2 text-sm text-slate-500">No players to show.</p>}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
               <h3 className="mb-2 text-sm font-medium text-slate-200">Sold ({soldPlayers.length})</h3>
@@ -149,19 +181,40 @@ function TournamentViewer({ slug }: { slug: string }) {
 
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-slate-200">Teams</h3>
-          {teams.map((team) => (
-            <div key={team.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-              <div className="mb-1 flex items-center justify-between">
-                <p className="font-medium text-slate-100">{team.name}</p>
-                {state.current_highest_team === team.id && (
-                  <span className="text-xs font-medium text-emerald-400">Highest bidder</span>
+          {teams.map((team) => {
+            const squad = soldPlayers.filter((p) => p.team === team.id)
+            const isExpanded = expandedTeamId === team.id
+            return (
+              <div key={team.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <button
+                  type="button"
+                  onClick={() => setExpandedTeamId(isExpanded ? null : team.id)}
+                  className="w-full text-left"
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="font-medium text-slate-100">{team.name}</p>
+                    {state.current_highest_team === team.id && (
+                      <span className="text-xs font-medium text-emerald-400">Highest bidder</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Remaining: {team.budget_remaining} · Squad: {team.squad_size}
+                  </p>
+                </button>
+                {isExpanded && (
+                  <ul className="mt-2 divide-y divide-slate-800 border-t border-slate-800 pt-2">
+                    {squad.map((player) => (
+                      <li key={player.id} className="flex justify-between px-1 py-1.5 text-sm">
+                        <span className="text-slate-200">{player.name}</span>
+                        <span className="text-emerald-400">{player.sold_price}</span>
+                      </li>
+                    ))}
+                    {squad.length === 0 && <li className="py-1.5 text-sm text-slate-500">No players yet.</li>}
+                  </ul>
                 )}
               </div>
-              <p className="text-xs text-slate-400">
-                Remaining: {team.budget_remaining} · Squad: {team.squad_size}
-              </p>
-            </div>
-          ))}
+            )
+          })}
           {teams.length === 0 && <p className="text-sm text-slate-500">No teams yet.</p>}
         </div>
       </div>
