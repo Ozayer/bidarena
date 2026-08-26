@@ -65,6 +65,7 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
   const [now, setNow] = useState(Date.now())
   const [showAllPlayers, setShowAllPlayers] = useState(false)
   const [customAmount, setCustomAmount] = useState('')
+  const [expandedPlayerId, setExpandedPlayerId] = useState<number | null>(null)
 
   const { data: positions } = useApiList<Position>(`positions/?tournament=${team.tournament}`)
   const { data: players, refetch: refetchPlayers } = useApiList<Player>(`players/?tournament=${team.tournament}`)
@@ -267,23 +268,59 @@ function TeamAuctionView({ team, refetchTeams }: { team: Team; refetchTeams: () 
               </label>
             </div>
             <ul className="max-h-72 divide-y divide-slate-800 overflow-y-auto">
-              {visiblePlayers.map((player) => (
-                <li key={player.id} className="flex items-center justify-between px-1 py-2 text-sm">
-                  <div>
-                    <span className="text-slate-100">{player.name}</span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      {positionName(player.position)} · {player.base_price} · {player.status}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => toggleWishlist(player)}
-                    title={isWishlisted(player.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                    className={isWishlisted(player.id) ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}
-                  >
-                    ★
-                  </button>
-                </li>
-              ))}
+              {visiblePlayers.map((player) => {
+                const isExpanded = expandedPlayerId === player.id
+                const extraInfo = Object.entries(player.extra_info ?? {})
+                return (
+                  <li key={player.id} className="px-1 py-2 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPlayerId(isExpanded ? null : player.id)}
+                      className="flex w-full items-center justify-between text-left"
+                    >
+                      <div>
+                        <span className="text-slate-100">{player.name}</span>
+                        <span className="ml-2 text-xs text-slate-500">
+                          {positionName(player.position)} · {player.base_price} · {player.status}
+                        </span>
+                      </div>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleWishlist(player)
+                        }}
+                        title={isWishlisted(player.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                        className={isWishlisted(player.id) ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}
+                      >
+                        ★
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="mt-2 flex gap-3 rounded border border-slate-800 bg-slate-950 p-3">
+                        {player.photo && (
+                          <img src={player.photo} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
+                        )}
+                        <div className="space-y-1 text-xs">
+                          <p className="text-slate-300">
+                            Position: <span className="text-slate-100">{positionName(player.position)}</span>
+                          </p>
+                          <p className="text-slate-300">
+                            Base price: <span className="text-slate-100">{player.base_price}</span>
+                          </p>
+                          <p className="text-slate-300">
+                            Status: <span className="text-slate-100">{player.status}</span>
+                          </p>
+                          {extraInfo.map(([key, value]) => (
+                            <p key={key} className="text-slate-300 capitalize">
+                              {key}: <span className="text-slate-100">{String(value)}</span>
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
               {visiblePlayers.length === 0 && <li className="py-2 text-sm text-slate-500">No players to show.</li>}
             </ul>
           </div>

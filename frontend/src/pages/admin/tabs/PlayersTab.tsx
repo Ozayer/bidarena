@@ -3,14 +3,26 @@ import { api } from '../../../api/client'
 import { useApiList } from '../../../api/hooks'
 import type { BulkUploadResult, Player, Position } from '../../../types/models'
 
+type ExtraInfoRow = { key: string; value: string }
+
 type FormState = {
   id: number | null
   name: string
   position: string
   base_price: string
+  extraInfo: ExtraInfoRow[]
 }
 
-const emptyForm: FormState = { id: null, name: '', position: '', base_price: '0' }
+const emptyForm: FormState = {
+  id: null,
+  name: '',
+  position: '',
+  base_price: '0',
+  extraInfo: [
+    { key: 'nationality', value: '' },
+    { key: 'club', value: '' },
+  ],
+}
 
 const statusLabels: Record<Player['status'], string> = {
   available: 'Available',
@@ -33,13 +45,33 @@ export default function PlayersTab({ tournamentId }: { tournamentId: number }) {
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   function startEdit(player: Player) {
+    const extraInfo = Object.entries(player.extra_info ?? {}).map(([key, value]) => ({
+      key,
+      value: String(value),
+    }))
     setForm({
       id: player.id,
       name: player.name,
       position: player.position ? String(player.position) : '',
       base_price: player.base_price,
+      extraInfo: extraInfo.length > 0 ? extraInfo : emptyForm.extraInfo,
     })
     setPhoto(null)
+  }
+
+  function updateExtraInfoRow(index: number, field: 'key' | 'value', value: string) {
+    setForm((f) => ({
+      ...f,
+      extraInfo: f.extraInfo.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    }))
+  }
+
+  function addExtraInfoRow() {
+    setForm((f) => ({ ...f, extraInfo: [...f.extraInfo, { key: '', value: '' }] }))
+  }
+
+  function removeExtraInfoRow(index: number) {
+    setForm((f) => ({ ...f, extraInfo: f.extraInfo.filter((_, i) => i !== index) }))
   }
 
   function resetForm() {
@@ -51,10 +83,15 @@ export default function PlayersTab({ tournamentId }: { tournamentId: number }) {
     e.preventDefault()
     setSubmitting(true)
     try {
+      const extraInfo = Object.fromEntries(
+        form.extraInfo.filter((row) => row.key.trim() && row.value.trim()).map((row) => [row.key.trim(), row.value.trim()])
+      )
+
       const body = new FormData()
       body.append('tournament', String(tournamentId))
       body.append('name', form.name)
       body.append('base_price', form.base_price)
+      body.append('extra_info', JSON.stringify(extraInfo))
       if (form.position) body.append('position', form.position)
       if (photo) body.append('photo', photo)
 
@@ -153,6 +190,44 @@ export default function PlayersTab({ tournamentId }: { tournamentId: number }) {
             />
           </div>
         </div>
+
+        <div>
+          <label className="mb-1 block text-xs text-slate-400">Additional details (optional)</label>
+          <div className="space-y-2">
+            {form.extraInfo.map((row, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  className="input"
+                  placeholder="e.g. nationality"
+                  value={row.key}
+                  onChange={(e) => updateExtraInfoRow(i, 'key', e.target.value)}
+                />
+                <input
+                  className="input"
+                  placeholder="e.g. Finland"
+                  value={row.value}
+                  onChange={(e) => updateExtraInfoRow(i, 'value', e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeExtraInfoRow(i)}
+                  className="shrink-0 text-red-400 hover:text-red-300"
+                  title="Remove field"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addExtraInfoRow}
+            className="mt-2 text-xs text-emerald-400 hover:text-emerald-300"
+          >
+            + Add another field
+          </button>
+        </div>
+
         <div className="flex gap-2">
           <button
             type="submit"

@@ -82,7 +82,8 @@ No self-signup — the admin creates the login (step 3 above) and shares it.
      (disabled once you already hold the highest bid).
    - A live **recent bids** ticker and your **remaining budget**.
 4. Browse the full **player pool** at any time, and star players onto your
-   private **wishlist** (only you can see it).
+   private **wishlist** (only you can see it). Click a player to expand their
+   photo and full details (nationality, club, etc., if the admin added them).
 5. As players are sold to you, they appear in **My squad** with the price
    you paid.
 
