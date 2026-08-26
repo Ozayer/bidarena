@@ -11,7 +11,24 @@ interface Paginated<T> {
   results: T[]
 }
 
-/** Fetches a DRF list endpoint (paginated or not) and exposes a refetch you can call after mutations. */
+async function fetchAllPages<T>(url: string): Promise<T[]> {
+  const all: T[] = []
+  let next: string | null = url
+  while (next) {
+    const res: { data: Paginated<T> | T[] } = await api.get<Paginated<T> | T[]>(next)
+    if (Array.isArray(res.data)) {
+      all.push(...res.data)
+      next = null
+    } else {
+      all.push(...res.data.results)
+      next = res.data.next
+    }
+  }
+  return all
+}
+
+/** Fetches every page of a DRF list endpoint (paginated or not) and exposes a refetch you
+ * can call after mutations — admin screens need the full list, not just the first page. */
 export function useApiList<T>(url: string) {
   const [data, setData] = useState<T[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,9 +42,8 @@ export function useApiList<T>(url: string) {
     }
     setLoading(true)
     setError(null)
-    api
-      .get<Paginated<T> | T[]>(url)
-      .then((res) => setData(Array.isArray(res.data) ? res.data : res.data.results))
+    fetchAllPages<T>(url)
+      .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [url])
