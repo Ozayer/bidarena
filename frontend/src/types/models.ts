@@ -23,7 +23,14 @@ export interface Tournament {
   themed_display_enabled: boolean
   theme_primary_logo: string | null
   theme_club_logo: string | null
-  theme_sponsor_logo: string | null
+  sponsor_logos: TournamentSponsorLogo[]
+}
+
+export interface TournamentSponsorLogo {
+  id: number
+  tournament: number
+  image: string
+  order: number
 }
 
 export interface Position {
@@ -157,5 +164,6 @@ export interface AuctionEvent {
   event_type: AuctionEventType
   player_name: string | null
   player_photo: string | null
+  team_logo: string | null
   detail: Record<string, unknown>
 }

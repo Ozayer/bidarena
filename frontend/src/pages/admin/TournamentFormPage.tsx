@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { Tournament } from '../../types/models'
+import type { Tournament, TournamentSponsorLogo } from '../../types/models'
 
 type FormState = {
   name: string
@@ -48,8 +48,10 @@ export default function TournamentFormPage() {
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null)
   const [themePrimaryLogo, setThemePrimaryLogo] = useState<File | null>(null)
   const [themeClubLogo, setThemeClubLogo] = useState<File | null>(null)
-  const [themeSponsorLogo, setThemeSponsorLogo] = useState<File | null>(null)
   const [existingTournament, setExistingTournament] = useState<Tournament | null>(null)
+  const [sponsorLogos, setSponsorLogos] = useState<TournamentSponsorLogo[]>([])
+  const [uploadingSponsorLogo, setUploadingSponsorLogo] = useState(false)
+  const sponsorLogoInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(isEdit)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -59,6 +61,7 @@ export default function TournamentFormPage() {
     api.get<Tournament>(`tournaments/${id}/`).then((res) => {
       const t = res.data
       setExistingTournament(t)
+      setSponsorLogos(t.sponsor_logos)
       setForm({
         name: t.name,
         description: t.description,
@@ -101,7 +104,6 @@ export default function TournamentFormPage() {
     if (coverPhoto) body.append('cover_photo', coverPhoto)
     if (themePrimaryLogo) body.append('theme_primary_logo', themePrimaryLogo)
     if (themeClubLogo) body.append('theme_club_logo', themeClubLogo)
-    if (themeSponsorLogo) body.append('theme_sponsor_logo', themeSponsorLogo)
 
     try {
       const res = isEdit
@@ -113,6 +115,28 @@ export default function TournamentFormPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleAddSponsorLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !id) return
+    setUploadingSponsorLogo(true)
+    try {
+      const body = new FormData()
+      body.append('tournament', id)
+      body.append('order', String(sponsorLogos.length))
+      body.append('image', file)
+      const res = await api.post<TournamentSponsorLogo>('sponsor-logos/', body)
+      setSponsorLogos((logos) => [...logos, res.data])
+    } finally {
+      setUploadingSponsorLogo(false)
+      if (sponsorLogoInputRef.current) sponsorLogoInputRef.current.value = ''
+    }
+  }
+
+  async function handleRemoveSponsorLogo(logoId: number) {
+    await api.delete(`sponsor-logos/${logoId}/`)
+    setSponsorLogos((logos) => logos.filter((l) => l.id !== logoId))
   }
 
   if (loading) return <div className="p-6 text-slate-400">Loading…</div>
@@ -229,7 +253,7 @@ export default function TournamentFormPage() {
             generic look. Toggle it off any time to go back to the generic view.
           </p>
 
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-slate-400">Tournament logo</label>
               {existingTournament?.theme_primary_logo && !themePrimaryLogo && (
@@ -254,18 +278,42 @@ export default function TournamentFormPage() {
                 className="text-sm text-slate-300"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-sm text-slate-400">Sponsor logo</label>
-              {existingTournament?.theme_sponsor_logo && !themeSponsorLogo && (
-                <img src={existingTournament.theme_sponsor_logo} alt="" className="mb-2 h-16 w-16 rounded-full object-cover" />
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setThemeSponsorLogo(e.target.files?.[0] ?? null)}
-                className="text-sm text-slate-300"
-              />
-            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm text-slate-400">Sponsor logos (you can add more than one)</label>
+            {isEdit ? (
+              <>
+                {sponsorLogos.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-3">
+                    {sponsorLogos.map((logo) => (
+                      <div key={logo.id} className="relative">
+                        <img src={logo.image} alt="" className="h-16 w-16 rounded-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSponsorLogo(logo.id)}
+                          title="Remove sponsor logo"
+                          className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white hover:bg-red-500"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  ref={sponsorLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingSponsorLogo}
+                  onChange={handleAddSponsorLogo}
+                  className="text-sm text-slate-300"
+                />
+                {uploadingSponsorLogo && <p className="mt-1 text-xs text-slate-500">Uploading…</p>}
+              </>
+            ) : (
+              <p className="text-xs text-slate-500">Save the tournament first, then come back here to add sponsor logos.</p>
+            )}
           </div>
         </div>
 

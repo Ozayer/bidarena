@@ -56,7 +56,6 @@ class Tournament(models.Model):
     )
     theme_primary_logo = models.ImageField(upload_to='tournaments/theme/', blank=True, null=True)
     theme_club_logo = models.ImageField(upload_to='tournaments/theme/', blank=True, null=True)
-    theme_sponsor_logo = models.ImageField(upload_to='tournaments/theme/', blank=True, null=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
@@ -75,6 +74,20 @@ class Tournament(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+
+
+class TournamentSponsorLogo(models.Model):
+    """One of possibly several sponsor logos shown on the branded big-screen display."""
+
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='sponsor_logos')
+    image = models.ImageField(upload_to='tournaments/theme/sponsors/')
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f'Sponsor logo for {self.tournament.name} (#{self.order})'
 
 
 class Position(models.Model):

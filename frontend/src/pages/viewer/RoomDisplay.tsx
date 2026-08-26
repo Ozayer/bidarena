@@ -62,7 +62,15 @@ type DisplayProps = {
   resultEvent: AuctionEvent | null
 }
 
-function ResultBanner({ event, variant }: { event: AuctionEvent; variant: 'generic' | 'themed' }) {
+function ResultBanner({
+  event,
+  variant,
+  tournamentLogo,
+}: {
+  event: AuctionEvent
+  variant: 'generic' | 'themed'
+  tournamentLogo: string | null
+}) {
   const isSold = event.event_type === 'sold' || event.event_type === 'manual_assign'
   const teamName = typeof event.detail.team_name === 'string' ? event.detail.team_name : null
   const amount = typeof event.detail.amount === 'string' ? event.detail.amount : null
@@ -75,31 +83,63 @@ function ResultBanner({ event, variant }: { event: AuctionEvent; variant: 'gener
     : 'bg-red-500/20 text-red-300 border-red-600'
 
   return (
-    <div className="flex w-full max-w-4xl flex-col items-center gap-6 text-center">
-      {event.player_photo && (
+    <div className="flex w-full max-w-6xl items-center justify-between gap-6">
+      <div className="flex w-36 shrink-0 items-center justify-center">
+        {isSold && tournamentLogo && (
+          <img src={tournamentLogo} alt="" className="h-32 w-32 rounded-full object-contain" />
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col items-center gap-6 text-center">
+        {event.player_photo && (
+          <img
+            src={event.player_photo}
+            alt=""
+            className={`h-72 w-72 rounded-2xl object-cover shadow-2xl ${
+              variant === 'themed' ? 'border-4 border-orange-400/70' : ''
+            }`}
+          />
+        )}
+        <h2 className="text-6xl font-extrabold">{event.player_name}</h2>
+        <span className={`rounded-full border-4 px-8 py-2 text-3xl font-extrabold uppercase tracking-wide ${badgeClass}`}>
+          {isSold ? 'Sold!' : 'Unsold'}
+        </span>
+        {isSold && teamName && (
+          <p className="text-3xl">
+            to <span className="font-bold">{teamName}</span>
+            {amount && (
+              <>
+                {' '}
+                for <span className={`font-extrabold ${accent}`}>{amount}</span>
+              </>
+            )}
+          </p>
+        )}
+      </div>
+
+      <div className="flex w-36 shrink-0 items-center justify-center">
+        {isSold && event.team_logo && (
+          <img src={event.team_logo} alt="" className="h-32 w-32 rounded-full object-contain" />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LogoWatermarks({ logos }: { logos: string[] }) {
+  if (logos.length === 0) return null
+  const tiles = Array.from({ length: 24 }, (_, i) => logos[i % logos.length])
+  return (
+    <div className="pointer-events-none absolute inset-0 grid grid-cols-6 gap-8 overflow-hidden p-8 opacity-[0.07]">
+      {tiles.map((src, i) => (
         <img
-          src={event.player_photo}
+          key={i}
+          src={src}
           alt=""
-          className={`h-72 w-72 rounded-2xl object-cover shadow-2xl ${
-            variant === 'themed' ? 'border-4 border-orange-400/70' : ''
-          }`}
+          className="h-20 w-20 self-center justify-self-center object-contain grayscale"
+          style={{ transform: `rotate(${(i % 2 === 0 ? -1 : 1) * 12}deg)` }}
         />
-      )}
-      <h2 className="text-6xl font-extrabold">{event.player_name}</h2>
-      <span className={`rounded-full border-4 px-8 py-2 text-3xl font-extrabold uppercase tracking-wide ${badgeClass}`}>
-        {isSold ? 'Sold!' : 'Unsold'}
-      </span>
-      {isSold && teamName && (
-        <p className="text-3xl">
-          to <span className="font-bold">{teamName}</span>
-          {amount && (
-            <>
-              {' '}
-              for <span className={`font-extrabold ${accent}`}>{amount}</span>
-            </>
-          )}
-        </p>
-      )}
+      ))}
     </div>
   )
 }
@@ -117,7 +157,9 @@ function GenericDisplay({ tournament, state, secondsLeft, resultEvent }: Display
       </div>
 
       <div className="flex flex-1 items-center justify-center">
-        {!currentPlayer && resultEvent && <ResultBanner event={resultEvent} variant="generic" />}
+        {!currentPlayer && resultEvent && (
+          <ResultBanner event={resultEvent} variant="generic" tournamentLogo={tournament.theme_primary_logo} />
+        )}
         {!currentPlayer && !resultEvent && <p className="text-4xl text-slate-600">Waiting for the next player…</p>}
         {currentPlayer && (
           <div className="flex w-full max-w-5xl items-center justify-between gap-12">
@@ -188,6 +230,14 @@ function ThemedDisplay({ tournament, state, secondsLeft, resultEvent }: DisplayP
         }}
       />
 
+      <LogoWatermarks
+        logos={[
+          tournament.theme_primary_logo,
+          tournament.theme_club_logo,
+          ...tournament.sponsor_logos.map((l) => l.image),
+        ].filter((l): l is string => Boolean(l))}
+      />
+
       <header className="relative z-10 flex items-center justify-between border-b border-orange-400/20 pb-5">
         <div className="flex items-center gap-4">
           {tournament.theme_club_logo && (
@@ -219,21 +269,28 @@ function ThemedDisplay({ tournament, state, secondsLeft, resultEvent }: DisplayP
           <span className="rounded-full border border-orange-400/50 bg-orange-400/10 px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-orange-300">
             {state.status.replace('_', ' ')}
           </span>
-          {tournament.theme_sponsor_logo && (
+          {tournament.sponsor_logos.length > 0 && (
             <div className="flex flex-col items-end gap-1">
               <span className="text-[10px] uppercase tracking-wide text-blue-200/70">Sponsored by</span>
-              <img
-                src={tournament.theme_sponsor_logo}
-                alt=""
-                className="h-16 w-16 rounded-full border-2 border-orange-400/60 object-cover shadow-lg shadow-orange-500/20"
-              />
+              <div className="flex gap-2">
+                {tournament.sponsor_logos.map((logo) => (
+                  <img
+                    key={logo.id}
+                    src={logo.image}
+                    alt=""
+                    className="h-16 w-16 rounded-full border-2 border-orange-400/60 object-cover shadow-lg shadow-orange-500/20"
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
       </header>
 
       <div className="relative z-10 flex flex-1 items-center justify-center">
-        {!currentPlayer && resultEvent && <ResultBanner event={resultEvent} variant="themed" />}
+        {!currentPlayer && resultEvent && (
+          <ResultBanner event={resultEvent} variant="themed" tournamentLogo={tournament.theme_primary_logo} />
+        )}
         {!currentPlayer && !resultEvent && (
           <p className="text-4xl font-semibold text-blue-200/60">Waiting for the next player…</p>
         )}

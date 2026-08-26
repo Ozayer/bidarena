@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import BidIncrementRule, Position, Tournament
+from .models import BidIncrementRule, Position, Tournament, TournamentSponsorLogo
 
 
 class PositionSerializer(serializers.ModelSerializer):
@@ -15,9 +15,16 @@ class BidIncrementRuleSerializer(serializers.ModelSerializer):
         fields = ['id', 'tournament', 'from_amount', 'to_amount', 'increment_amount']
 
 
+class TournamentSponsorLogoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TournamentSponsorLogo
+        fields = ['id', 'tournament', 'image', 'order']
+
+
 class TournamentSerializer(serializers.ModelSerializer):
     positions = PositionSerializer(many=True, read_only=True)
     increment_rules = BidIncrementRuleSerializer(many=True, read_only=True)
+    sponsor_logos = TournamentSponsorLogoSerializer(many=True, read_only=True)
 
     class Meta:
         model = Tournament
@@ -29,6 +36,6 @@ class TournamentSerializer(serializers.ModelSerializer):
             'result_display_seconds',
             'public_guest_link_enabled', 'created_by', 'created_at', 'updated_at',
             'positions', 'increment_rules',
-            'themed_display_enabled', 'theme_primary_logo', 'theme_club_logo', 'theme_sponsor_logo',
+            'themed_display_enabled', 'theme_primary_logo', 'theme_club_logo', 'sponsor_logos',
         ]
         read_only_fields = ['slug', 'created_by', 'created_at', 'updated_at']

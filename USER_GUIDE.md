@@ -62,7 +62,10 @@ below) normally uses a generic dark look. To brand it for a specific
 tournament:
 
 1. Open **Edit tournament** and, under "Use branded big-screen display",
-   upload a tournament logo, club logo, and sponsor logo, then save.
+   upload a tournament logo and club logo, then save. Once the tournament is
+   saved, come back to this section to add one or more sponsor logos (add/remove
+   any time — no need to re-save the whole form). All of these logos also
+   appear as a subtle watermark pattern across the branded display.
 2. From the tournament workspace header, click the **Big screen: Generic /
    Branded** button to switch the live display — it updates instantly and
    is fully reversible, so you can toggle back to the generic view any

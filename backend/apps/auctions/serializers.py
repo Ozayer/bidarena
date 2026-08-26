@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.players.serializers import PlayerSerializer
 from apps.pools.serializers import PoolSerializer
+from apps.teams.models import Team
 from apps.teams.serializers import TeamSerializer
 
 from .models import AuctionEvent, AuctionSession, Bid, Wishlist
@@ -75,15 +76,24 @@ class AuctionStateSerializer(serializers.ModelSerializer):
         event = obj.tournament.auction_events.select_related('player').first()
         if not event:
             return None
+        request = self.context.get('request')
         photo_url = None
         if event.player and event.player.photo:
-            request = self.context.get('request')
             url = event.player.photo.url
             photo_url = request.build_absolute_uri(url) if request else url
+
+        team_logo_url = None
+        team_id = event.detail.get('team_id') if isinstance(event.detail, dict) else None
+        if team_id:
+            team = Team.objects.filter(id=team_id).only('logo').first()
+            if team and team.logo:
+                team_logo_url = request.build_absolute_uri(team.logo.url) if request else team.logo.url
+
         return {
             'id': event.id,
             'event_type': event.event_type,
             'player_name': event.player.name if event.player else None,
             'player_photo': photo_url,
+            'team_logo': team_logo_url,
             'detail': event.detail,
         }

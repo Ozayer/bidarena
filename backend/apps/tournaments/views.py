@@ -5,8 +5,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .exports import build_results_csv, build_results_pdf
-from .models import BidIncrementRule, Position, Tournament
-from .serializers import BidIncrementRuleSerializer, PositionSerializer, TournamentSerializer
+from .models import BidIncrementRule, Position, Tournament, TournamentSponsorLogo
+from .serializers import (
+    BidIncrementRuleSerializer,
+    PositionSerializer,
+    TournamentSerializer,
+    TournamentSponsorLogoSerializer,
+)
 
 User = get_user_model()
 
@@ -52,4 +57,10 @@ class PositionViewSet(viewsets.ModelViewSet):
 class BidIncrementRuleViewSet(viewsets.ModelViewSet):
     queryset = BidIncrementRule.objects.all()
     serializer_class = BidIncrementRuleSerializer
+    filterset_fields = ['tournament']
+
+
+class TournamentSponsorLogoViewSet(viewsets.ModelViewSet):
+    queryset = TournamentSponsorLogo.objects.all()
+    serializer_class = TournamentSponsorLogoSerializer
     filterset_fields = ['tournament']
