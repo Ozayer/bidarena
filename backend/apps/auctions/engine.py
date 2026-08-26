@@ -136,9 +136,26 @@ def place_bid(session, team, actor=None, amount=None):
     squad_after = team.squad_size + 1
     remaining_required_after = max(tournament.players_per_team_min - squad_after, 0)
     budget_after = team.budget_remaining - amount
-    if budget_after < remaining_required_after:
+    if remaining_required_after > 0:
+        # Reserve enough to actually buy the rest of the squad, not just $1/slot —
+        # use the cheapest still-purchasable player's base price as the per-slot floor,
+        # since base prices aren't necessarily uniform (and this stays correct if they change).
+        cheapest_remaining = (
+            Player.objects.filter(tournament=tournament)
+            .exclude(status=Player.Status.SOLD)
+            .exclude(id=player.id)
+            .order_by('base_price')
+            .values_list('base_price', flat=True)
+            .first()
+        )
+        required_reserve = remaining_required_after * (cheapest_remaining or Decimal('0'))
+    else:
+        required_reserve = Decimal('0')
+    if budget_after < required_reserve:
         raise EngineError(
-            "This bid would leave the team unable to afford its minimum required squad."
+            f"This bid would leave the team unable to afford its remaining "
+            f"{remaining_required_after} required player(s) "
+            f"(at least {required_reserve} needed, {budget_after} would be left)."
         )
 
     Bid.objects.create(tournament=tournament, player=player, team=team, amount=amount, placed_by=actor)

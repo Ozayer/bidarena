@@ -84,6 +84,40 @@ class CustomBidAmountTests(TestCase):
         self.assertEqual(self.session.current_highest_bid, self.player.base_price)
 
 
+class PurseSafetyTests(TestCase):
+    """A bid must leave enough budget to actually buy the rest of the required squad —
+    not just $1 per remaining slot, but the cheapest remaining player's real base price."""
+
+    def setUp(self):
+        self.tournament = Tournament.objects.create(
+            name='Test Cup', default_team_budget=Decimal('100'), players_per_team_min=3,
+        )
+        self.pool = Pool.objects.create(tournament=self.tournament, name='Pool A')
+        self.player = Player.objects.create(
+            tournament=self.tournament, name='Up now', base_price=Decimal('5'),
+            pool=self.pool, status=Player.Status.POOLED,
+        )
+        # Two more players still purchasable elsewhere, cheapest at base price 5 —
+        # the team must be left with at least 2 * 5 = 10 after this bid.
+        Player.objects.create(tournament=self.tournament, name='P2', base_price=Decimal('5'))
+        Player.objects.create(tournament=self.tournament, name='P3', base_price=Decimal('8'))
+        self.team = Team.objects.create(tournament=self.tournament, name='Team A', budget_total=Decimal('100'))
+        engine.start_auction(self.tournament)
+        self.session = engine.get_or_create_session(self.tournament)
+        engine.start_next_player(self.session, pool=self.pool)
+
+    def test_bid_leaving_less_than_cheapest_remaining_players_cost_is_rejected(self):
+        # 100 - 91 = 9 left, but 2 more required players at >= 5 each need 10.
+        with self.assertRaises(engine.EngineError):
+            engine.place_bid(self.session, self.team, amount='91')
+
+    def test_bid_leaving_exactly_enough_for_remaining_players_is_accepted(self):
+        # 100 - 90 = 10 left, exactly enough for 2 more players at the 5 floor.
+        engine.place_bid(self.session, self.team, amount='90')
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.current_highest_bid, Decimal('90.00'))
+
+
 class LowPriorityDrawOrderTests(TestCase):
     """Players returned to a pool after going unsold are only drawn once every
     normal-priority player in that pool has been auctioned."""
